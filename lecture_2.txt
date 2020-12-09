@@ -1,0 +1,22 @@
+
+# создать топик lesson2 в кафке на worker-0, 3 партиции, 2 реплики, хранение вечно
+/usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --create --topic shadrin_les2 --zookeeper bigdataanalytics-worker-0.novalocal:2181 --partitions 3 --replication-factor 2 --config retention.ms=-1
+
+# альтернативное создание с указанием нескольких серверов с кафкой
+/usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --create --topic shadrin_les2 --zookeeper bigdataanalytics-worker-1.novalocal:2181,bigdataanalytics-worker-3.novalocal:2181 --partitions 3 --replication-factor 2 --config retention.ms=-1
+
+# изменить время хранения в топике lesson2 записей на 200 дней
+/usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --zookeeper bigdataanalytics-worker-0.novalocal:2181 --alter --config retention.ms=17280000000 --topic shadrin_les2
+
+# ещё раз изменить время хранения на 1мс
+/usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --zookeeper bigdataanalytics-worker-0.novalocal:2181 --alter --config retention.ms=1 --topic shadrin_les2
+
+# удалить топик
+/usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --zookeeper bigdataanalytics-worker-0.novalocal:2181 --delete --topic shadrin_les2
+
+# создать слив, пишет в консоль
+/usr/hdp/3.1.4.0-315/kafka/bin/kafka-console-consumer.sh --topic shadrin_les2 --from-beginning --bootstrap-server bigdataanalytics-worker-0.novalocal:6667
+
+# создать источник, читает из консоли
+/usr/hdp/3.1.4.0-315/kafka/bin/kafka-console-producer.sh --topic shadrin_les2 --broker-list bigdataanalytics-worker-0.novalocal:6667
+
