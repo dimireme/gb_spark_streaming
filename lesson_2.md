@@ -28,7 +28,7 @@
 
 ##### Создать свои топик в kafka. Поиграться с retention time, console-consumer, console-producer.
 
-1. Подключаемся к серверу
+1\. Подключаемся к серверу
 
 ```bash
 ssh BD_274_ashadrin@89.208.223.141 -i ~/.ssh/id_rsa_gb_spark
@@ -105,7 +105,7 @@ message 5
 message 7
 ```
 
-8\. В конце удаляем топик.
+9\. В конце удаляем топик.
 
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --zookeeper bigdataanalytics-worker-0.novalocal:2181 --delete --topic shadrin_les2
