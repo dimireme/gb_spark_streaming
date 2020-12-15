@@ -55,7 +55,6 @@ usa_president_1.csv  usa_president_2.csv  usa_president_3.csv  usa_president_4.c
 В командной строке `pyspark` импортируем нужные методы и определяем функцию `console_output` для вывода стрима в консоль. 
 
 ```python
-from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StringType
 
@@ -224,7 +223,7 @@ out = console_output(extra_files, 5)
 
 1\.7\. Завершение первой части.
 
-Закрываем стим и выходим из консоли `pyspark`  
+Закрываем стрим и выходим из консоли `pyspark`.
 
 ```python
 out.stop()
@@ -238,5 +237,278 @@ exit()
 20/12/14 11:48:10 INFO fs.TrashPolicyDefault: Moved: 'hdfs://bigdataanalytics-head-0.novalocal:8020/user/BD_274_ashadrin/input_csv_for_stream' to trash at: hdfs://bigdataanalytics-head-0.novalocal:8020/user/BD_274_ashadrin/.Trash/Current/user/BD_274_ashadrin/input_csv_for_stream
 ```
 
-##### Создать свой топик/топики, загрузить туда через консоль осмысленные данные с kaggle. Лучше в формате json. Много сообщений не нужно, достаточно штук 10-100.
-Прочитать свой топик так же, как на уроке.
+##### Создать свой топик/топики, загрузить туда через консоль осмысленные данные с kaggle. Лучше в формате json. Много сообщений не нужно, достаточно штук 10-100. Прочитать свой топик так же, как на уроке.
+
+
+2\.1\. Аналогично второму уроку создадим топик `shadrin_iris`. 
+
+В одном терминале запустим `console-producer` для записи данных в топик.
+
+```bash
+[BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --create --topic shadrin_iris --zookeeper bigdataanalytics-worker-0.novalocal:2181 --partitions 1 --replication-factor 2 --config retention.ms=-1
+WARNING: Due to limitations in metric names, topics with a period ('.') or underscore ('_') could collide. To avoid issues it is best to use either, but not both.
+Created topic "shadrin_iris".
+```
+
+```bash
+[BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /usr/hdp/3.1.4.0-315/kafka/bin/kafka-console-producer.sh --topic shadrin_iris --broker-list bigdataanalytics-worker-0.novalocal:6667
+```
+
+Во втором терминале запустим `console-consumer` чтобы проконтролировать запись.
+
+```bash
+[BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /usr/hdp/3.1.4.0-315/kafka/bin/kafka-console-consumer.sh --topic shadrin_iris --bootstrap-server bigdataanalytics-worker-0.novalocal:6667
+```
+
+Для записи выбран классический датасет ирисов. У топика не ограниченное время жизни, так что данные в партиции затираться не будут. Проверим как можно читать из Кафки. В этой секции все прочитанные данные будем выводить в консоль.
+
+2\.2\. Консоль pyspark. 
+
+```bash
+[BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ pyspark --master local[1] --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.3.2
+```
+
+В параметрах запуска `--master local[1]` определяет что спарк будет запущен на одной ноде. Параметр `--packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.3.2` определяет с какой версией ............ TODO: дополнить.  После загрузки библиотеки, определяем базовые функции.
+
+```python
+from pyspark.sql import functions as F
+from pyspark.sql.types import StructType, StringType, FloatType
+
+kafka_brokers = "bigdataanalytics-worker-0.novalocal:6667"
+
+def console_output(df, freq):
+    return df.writeStream \
+        .format("console") \
+        .trigger(processingTime='%s seconds' % freq ) \
+        .options(truncate=True) \
+        .start()
+``` 
+
+2\.3\. Чтение  батчевом режиме.
+
+```python
+raw_data = spark.read. \
+    format("kafka"). \
+    option("kafka.bootstrap.servers", kafka_brokers). \
+    option("subscribe", "shadrin_iris"). \
+    option("startingOffsets", "earliest"). \
+    option("endingOffsets", """{"shadrin_iris":{"0":20}}"""). \
+    load()
+
+raw_data.show(100)
+```
+
+
+    +----+--------------------+------------+---------+------+--------------------+-------------+
+    | key|               value|       topic|partition|offset|           timestamp|timestampType|
+    +----+--------------------+------------+---------+------+--------------------+-------------+
+    |null|[7B 22 73 65 70 6...|shadrin_iris|        0|     0|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|     1|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|     2|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|     3|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|     4|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|     5|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|     6|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|     7|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|     8|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|     9|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    10|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    11|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    12|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    13|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    14|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    15|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    16|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    17|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    18|2020-12-14 23:41:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    19|2020-12-14 23:41:...|            0|
+    +----+--------------------+------------+---------+------+--------------------+-------------+
+
+Параметры чтения:
+
+`endingOffsets` - последнее значение `offset`, до которого нужно прочитать сообщения. Есть только при батчевом чтении (`spark.read`). В стриминговом чтении (`spark.readStream`) финальный оффсет задать нельзя. 
+
+Формат: `{"shadrin_iris":{"0":20}}`. Здесь `shadrin_iris` - топик; `0` - партиция, на которую накладывается ограничение; `20` - `offset` записи, до которой нужно прочитать партицию. Запись с `offset=20` прочитана не будет.  
+ 
+`startingOffsets` - значение `offset` в партиции, с которого будут читаться сообщения. Есть в стриминговом и батчевом режимах чтения. Возможные значения `latest`, `earliest`, или строка `{"shadrin_iris":{"0":10}}` в формате, аналоичном `endingOffsets`.
+
+
+2\.4\. Стриминговое чтение из Кафки.
+
+```python
+raw_data = spark.readStream. \
+    format("kafka"). \
+    option("kafka.bootstrap.servers", kafka_brokers). \
+    option("subscribe", "shadrin_iris"). \
+    option("startingOffsets", "earliest"). \
+    option("maxOffsetsPerTrigger", "5"). \
+    load()
+    
+out = console_output(raw_data, 5)
+```
+
+Наблюдаем батчи по 5 записей раз в 5 секунд (`maxOffsetsPerTrigger = 5`). Всего 150 записей, 30 батчей.
+
+    -------------------------------------------
+    Batch: 14
+    -------------------------------------------
+    +----+--------------------+------------+---------+------+--------------------+-------------+
+    | key|               value|       topic|partition|offset|           timestamp|timestampType|
+    +----+--------------------+------------+---------+------+--------------------+-------------+
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    70|2020-12-15 00:21:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    71|2020-12-15 00:21:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    72|2020-12-15 00:21:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    73|2020-12-15 00:21:...|            0|
+    |null|[20 20 7B 22 73 6...|shadrin_iris|        0|    74|2020-12-15 00:21:...|            0|
+    +----+--------------------+------------+---------+------+--------------------+-------------+
+
+```python
+out.stop()
+```
+
+Так же попробовал читать с различными начальными отступами. Результат аналогичный.
+
+2\.5\. Парсинг сообщений.
+
+Посмотрим в каком формате в Кафке хранятся сообщения. 
+
+```python
+raw_data.printSchema()
+root
+ |-- key: binary (nullable = true)
+ |-- value: binary (nullable = true)
+ |-- topic: string (nullable = true)
+ |-- partition: integer (nullable = true)
+ |-- offset: long (nullable = true)
+ |-- timestamp: timestamp (nullable = true)
+ |-- timestampType: integer (nullable = true)
+```
+
+`value` это всегда либо бинарный код, либо строка.
+
+Определяем структуру данных нашего исходного датасета.
+
+```python
+schema = StructType() \
+    .add("sepalLength", FloatType()) \
+    .add("sepalWidth", FloatType()) \
+    .add("petalLength", FloatType()) \
+    .add("petalWidth", FloatType()) \
+    .add("species", StringType())
+    
+    
+value_iris = raw_data \
+    .select(
+        F.from_json(F.col("value").cast("String"), schema).alias("value"), 
+        "offset"
+    )
+    
+value_iris.printSchema()
+```
+
+    root
+     |-- value: struct (nullable = true)
+     |    |-- sepalLength: float (nullable = true)
+     |    |-- sepalWidth: float (nullable = true)
+     |    |-- petalLength: float (nullable = true)
+     |    |-- petalWidth: float (nullable = true)
+     |    |-- species: string (nullable = true)
+     |-- offset: long (nullable = true)
+
+
+Выбрали само значение и отступ. Видим что в `value` подтянулась наша схема. 
+
+Поднимем значения в `value` на уровень выше.
+
+```python
+parsed_iris = value_iris.select("value.*", "offset")
+parsed_iris.printSchema()
+```
+
+    root
+     |-- sepalLength: float (nullable = true)
+     |-- sepalWidth: float (nullable = true)
+     |-- petalLength: float (nullable = true)
+     |-- petalWidth: float (nullable = true)
+     |-- species: string (nullable = true)
+     |-- offset: long (nullable = true)
+
+
+```python
+out = console_output(parsed_iris.withColumn(
+    'foo', 
+    F.col("sepalLength") / F.col("petalLength")
+), 30)
+```
+
+    -------------------------------------------
+    Batch: 0
+    -------------------------------------------
+    +-----------+----------+-----------+----------+-------+------+------------------+
+    |sepalLength|sepalWidth|petalLength|petalWidth|species|offset|               foo|
+    +-----------+----------+-----------+----------+-------+------+------------------+
+    |        5.1|       3.5|        1.4|       0.2| setosa|     0| 3.642857136775036|
+    |        4.9|       3.0|        1.4|       0.2| setosa|     1| 3.500000127724241|
+    |        4.7|       3.2|        1.3|       0.2| setosa|     2|3.6153846012770066|
+    |        4.6|       3.1|        1.5|       0.2| setosa|     3| 3.066666603088379|
+    |        5.0|       3.6|        1.4|       0.2| setosa|     4|3.5714286322496385|
+    +-----------+----------+-----------+----------+-------+------+------------------+
+
+
+```python
+out.stop()
+```
+
+2\.6\. Чекпоинты
+
+```python
+def console_output_checkpointed(df, freq):
+    return df.writeStream \
+        .format("console") \
+        .trigger(processingTime='%s seconds' % freq) \
+        .option("truncate",False) \
+        .option("checkpointLocation", "shadrin_iris_console_checkpoint") \
+        .start()
+
+out = console_output_checkpointed(parsed_iris, 5)
+out.stop()
+```
+    
+    -------------------------------------------
+    Batch: 5
+    -------------------------------------------
+    +-----------+----------+-----------+----------+-------+------+
+    |sepalLength|sepalWidth|petalLength|petalWidth|species|offset|
+    +-----------+----------+-----------+----------+-------+------+
+    |5.0        |3.2       |1.2        |0.2       |setosa |35    |
+    |5.5        |3.5       |1.3        |0.2       |setosa |36    |
+    |4.9        |3.6       |1.4        |0.1       |setosa |37    |
+    |4.4        |3.0       |1.3        |0.2       |setosa |38    |
+    |5.1        |3.4       |1.5        |0.2       |setosa |39    |
+    +-----------+----------+-----------+----------+-------+------+
+    
+При следующем чтении топика с помощью метода `console_output_checkpointed` чтение начнется со следующей записи.
+
+```python
+out = console_output_checkpointed(parsed_iris, 5)
+```
+
+    -------------------------------------------
+    Batch: 6
+    -------------------------------------------
+    +-----------+----------+-----------+----------+-------+------+
+    |sepalLength|sepalWidth|petalLength|petalWidth|species|offset|
+    +-----------+----------+-----------+----------+-------+------+
+    |5.0        |3.5       |1.3        |0.3       |setosa |40    |
+    |4.5        |2.3       |1.3        |0.3       |setosa |41    |
+    |4.4        |3.2       |1.3        |0.2       |setosa |42    |
+    |5.0        |3.5       |1.6        |0.6       |setosa |43    |
+    |5.1        |3.8       |1.9        |0.4       |setosa |44    |
+    +-----------+----------+-----------+----------+-------+------+
+    
+    
+```python
+out.stop()
+```
+
+
