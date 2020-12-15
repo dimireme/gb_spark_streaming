@@ -1,6 +1,6 @@
 ## Урок 3. Spark Streaming. Чтение Kafka.
 
-##### Повторить чтение файлов со своими файлами со своей схемой.
+##### Задание 1. Повторить чтение файлов со своими файлами со своей схемой.
 
 
 1\.1\. Подключаемся к серверу
@@ -11,7 +11,7 @@
 
 1\.2\. Подготовка файлов и папок. 
 
-Создадим папку `input_csv_for_stream` на HDFS, из который стрим будет читать файлы.
+Создадим папку `input_csv_for_stream` на HDFS, из которой стрим будет читать файлы.
 
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ hdfs dfs -mkdir input_csv_for_stream
@@ -42,7 +42,7 @@ scp -i ~/.ssh/id_rsa_gb_spark -r /usa_president BD_274_ashadrin@89.208.223.141:~
 usa_president_1.csv  usa_president_2.csv  usa_president_3.csv  usa_president_4.csv  usa_president_5.csv
 ```
 
-Файлы содержат список президентов США, максимум 10 записей. Столбцы файлов `President`, `Took office`, `Left office`.
+Файлы содержат список президентов США, максимум 10 записей в файле. Столбцы файлов `President`, `Took office`, `Left office`.
 
 1\.3\. Запускаем `pyspark`. 
 
@@ -75,7 +75,7 @@ schema = StructType() \
     .add("Left office", StringType())
 ``` 
  
-Создаём стрим чтения из файла. Параметр `.format("csv")` определяет что чтение будет происходить из файла. В `options` указываем папку на HDFS, из которой будут читаться файлы.
+Создаём стрим чтения из файла (с параметром `.format("csv")`). В `options` указываем папку на HDFS, из которой будут читаться файлы.
 
 ```python
 raw_files = spark \
@@ -237,18 +237,18 @@ exit()
 20/12/14 11:48:10 INFO fs.TrashPolicyDefault: Moved: 'hdfs://bigdataanalytics-head-0.novalocal:8020/user/BD_274_ashadrin/input_csv_for_stream' to trash at: hdfs://bigdataanalytics-head-0.novalocal:8020/user/BD_274_ashadrin/.Trash/Current/user/BD_274_ashadrin/input_csv_for_stream
 ```
 
-##### Создать свой топик/топики, загрузить туда через консоль осмысленные данные с kaggle. Лучше в формате json. Много сообщений не нужно, достаточно штук 10-100. Прочитать свой топик так же, как на уроке.
+##### Задание 2. Создать свой топик/топики, загрузить туда через консоль осмысленные данные с kaggle. Лучше в формате json. Много сообщений не нужно, достаточно штук 10-100. Прочитать свой топик так же, как на уроке.
 
 
 2\.1\. Аналогично второму уроку создадим топик `shadrin_iris`. 
-
-В одном терминале запустим `console-producer` для записи данных в топик.
 
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --create --topic shadrin_iris --zookeeper bigdataanalytics-worker-0.novalocal:2181 --partitions 1 --replication-factor 2 --config retention.ms=-1
 WARNING: Due to limitations in metric names, topics with a period ('.') or underscore ('_') could collide. To avoid issues it is best to use either, but not both.
 Created topic "shadrin_iris".
 ```
+
+В одном терминале запустим `console-producer` для записи данных в топик.
 
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /usr/hdp/3.1.4.0-315/kafka/bin/kafka-console-producer.sh --topic shadrin_iris --broker-list bigdataanalytics-worker-0.novalocal:6667
@@ -262,13 +262,26 @@ Created topic "shadrin_iris".
 
 Для записи выбран классический датасет ирисов. У топика не ограниченное время жизни, так что данные в партиции затираться не будут. Проверим как можно читать из Кафки. В этой секции все прочитанные данные будем выводить в консоль.
 
-2\.2\. Консоль pyspark. 
+2\.2\. Переходим в консоль pyspark. 
 
 ```bash
+[BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ export SPARK_KAFKA_VERSION=0.10
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ pyspark --master local[1] --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.3.2
 ```
 
-В параметрах запуска `--master local[1]` определяет что спарк будет запущен на одной ноде. Параметр `--packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.3.2` определяет с какой версией ............ TODO: дополнить.  После загрузки библиотеки, определяем базовые функции.
+`export SPARK_KAFKA_VERSION=0.10` - устанавливаем временную (на сессию) переменную окружения с версией Кафки. 
+
+В параметрах запуска `--master local[1]` определяет что Spark будет запущен на одной ноде. Параметр `--packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.3.2` определяет с какой версией Кафки мы будем работать.
+ 
+ 0.10 - версия Кафки;
+ 
+ 2.11 - версия языка Scala, на котрой написан Spark;
+ 
+ 2.3.2 - версия Spark, которая запускается на ноде.
+  
+  При этом в Spark подтягивается указанный пакет из Maven репозитория. Надеюсь тут нигде не напутал с определениями.
+ 
+ После загрузки пакета определяем базовые функции. 
 
 ```python
 from pyspark.sql import functions as F
@@ -326,7 +339,7 @@ raw_data.show(100)
 
 Параметры чтения:
 
-`endingOffsets` - последнее значение `offset`, до которого нужно прочитать сообщения. Есть только при батчевом чтении (`spark.read`). В стриминговом чтении (`spark.readStream`) финальный оффсет задать нельзя. 
+`endingOffsets` - последнее значение `offset`, до которого нужно прочитать сообщения. Есть только при батчевом чтении (`spark.read`). В стриминговом чтении (`spark.readStream`) финальный оффсет задать нельзя, он всегда равен `latest`. 
 
 Формат: `{"shadrin_iris":{"0":20}}`. Здесь `shadrin_iris` - топик; `0` - партиция, на которую накладывается ограничение; `20` - `offset` записи, до которой нужно прочитать партицию. Запись с `offset=20` прочитана не будет.  
  
@@ -344,10 +357,10 @@ raw_data = spark.readStream. \
     option("maxOffsetsPerTrigger", "5"). \
     load()
     
-out = console_output(raw_data, 5)
+out = console_output(raw_data, 10)
 ```
 
-Наблюдаем батчи по 5 записей раз в 5 секунд (`maxOffsetsPerTrigger = 5`). Всего 150 записей, 30 батчей.
+Наблюдаем батчи по 5 записей раз в 10 секунд (`maxOffsetsPerTrigger = 5`). Всего 150 записей, 30 батчей.
 
     -------------------------------------------
     Batch: 14
@@ -487,7 +500,7 @@ out.stop()
     |5.1        |3.4       |1.5        |0.2       |setosa |39    |
     +-----------+----------+-----------+----------+-------+------+
     
-При следующем чтении топика с помощью метода `console_output_checkpointed` чтение начнется со следующей записи.
+При следующем чтении топика с помощью метода `console_output_checkpointed` чтение начнется со следующей записи. Метаданные о чекпойнте хранятся в папке `shadrin_iris_console_checkpoint` на HDFS.
 
 ```python
 out = console_output_checkpointed(parsed_iris, 5)
