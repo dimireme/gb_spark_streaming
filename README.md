@@ -9,6 +9,8 @@
 
 [Урок 3. Spark Streaming. Чтение Kafka, чтение файлов в реальном времени.](/lesson_3.md)
 
+[Урок 4. Spark Streaming. Sinks.](/lesson_4.md)
+
 ### Документация
 
 [Structured Streaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html)
