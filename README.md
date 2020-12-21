@@ -17,6 +17,8 @@
 
 [Structured Streaming + Kafka Integration Guide](https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html)
 
+[Spark By Examples](https://sparkbyexamples.com)
+
 ### Консолидированные знания
 
 **Spark-streamig** - инструмент для настройки маршрута сообщений. 
