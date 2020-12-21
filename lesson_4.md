@@ -353,6 +353,72 @@ Topic shadrin_iris_sink is marked for deletion.
 Note: This will have no impact if delete.topic.enable is not set to true.
 ```
 
+1\.7\. FOREACH BATCH SINK
+
+Добавим к датасету `parsed_iris` метку времени, когда обрабатывался микробатч.
+
+```python
+extended_iris = parsed_iris.withColumn("my_current_time", F.current_timestamp())
+```
+
+В синке `foreach batch` вместо формата указывается функция, которая будет получать микробатч и его порядковый номер. Внутри функции с микробатчем можно работать как со статическим датафреймом.
+
+```python
+def foreach_batch_sink(df, freq):
+    return  df \
+        .writeStream \
+        .foreachBatch(foreach_batch_function) \
+        .trigger(processingTime='%s seconds' % freq ) \
+        .start()
+```
+
+Функция, которая будет обрабатывать микробатч:
+
+```python
+def foreach_batch_function(df, epoch_id):
+    print("starting epoch " + str(epoch_id) )
+    print("average values for batch:")
+    df.persist()
+    df.groupBy("species").avg().show()
+    df.unpersist()
+    print("finishing epoch " + str(epoch_id))
+```
+
+Запустим стрим.
+
+```python
+stream = foreach_batch_sink(extended_iris, 5)
+```
+
+В консоли наблюдаем преобразованные микробатчи. Не наблюдаем колонку `my_current_time`, видимо по ней не отрабатывает аггрегационная функция.
+
+    starting epoch 9
+    average values for batch:
+    +-------+-----------------+---------------+------------------+------------------+-----------+
+    |species| avg(sepalLength)|avg(sepalWidth)|  avg(petalLength)|   avg(petalWidth)|avg(offset)|
+    +-------+-----------------+---------------+------------------+------------------+-----------+
+    | setosa|4.960000038146973|            3.4|1.4599999904632568|0.2200000047683716|       47.0|
+    +-------+-----------------+---------------+------------------+------------------+-----------+
+    
+    finishing epoch 9
+    starting epoch 10
+    average values for batch:
+    +----------+-----------------+------------------+-----------------+------------------+-----------+
+    |   species| avg(sepalLength)|   avg(sepalWidth)| avg(petalLength)|   avg(petalWidth)|avg(offset)|
+    +----------+-----------------+------------------+-----------------+------------------+-----------+
+    |versicolor|6.460000038146973|2.9199999809265136|4.539999961853027|1.4399999856948853|       52.0|
+    +----------+-----------------+------------------+-----------------+------------------+-----------+
+    
+    finishing epoch 10
+
+Остановим стрим.
+
+```python
+stream.stop()
+```
+
+Внутри функции `foreach_batch_function` с микробатчем можно работать как со статическим датафреймом. Можно по фильтру разбивать данные на разные датафреймы, обогащать их и записывать в файлы по разным директориям.
+
 ##### Задание 2. Для DE написать стабильную функцию compaction.
  
 ```python

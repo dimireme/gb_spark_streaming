@@ -222,11 +222,11 @@ out.stop()
 
 Метод для прекращения всех активных стримов
 
-```text
->>> def killAll():
-...     for active_stream in spark.streams.active:
-...         print("Stopping %s by killAll" % active_stream)
-...         active_stream.stop()
+```python
+def killAll():
+    for active_stream in spark.streams.active:
+        print("Stopping %s by killAll" % active_stream)
+        active_stream.stop()
 ```
 
 Проверим как он отработает, если объект вывода стрима в консоль не сохранить в переменную.
