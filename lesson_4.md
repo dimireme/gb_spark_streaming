@@ -378,9 +378,7 @@ def foreach_batch_sink(df, freq):
 def foreach_batch_function(df, epoch_id):
     print("starting epoch " + str(epoch_id) )
     print("average values for batch:")
-    df.persist()
     df.groupBy("species").avg().show()
-    df.unpersist()
     print("finishing epoch " + str(epoch_id))
 ```
 
