@@ -459,7 +459,7 @@ Found 2 items
 -rw-r--r--   3 BD_274_ashadrin BD_274_ashadrin       2062 2020-12-21 01:59 my_parquet_sink/part-00000-2d437995-1c62-48f4-a687-7a15cf2cd5cd-c000.snappy.parquet
 ```
 
-Проверил, чекполйнт не сломался, стрим можно перезапустить, он будет добавлять в директорию `my_parquet_sink` новые файлы:
+Проверил, чекпойнт не сломался, стрим можно перезапустить, он будет добавлять в директорию `my_parquet_sink` новые файлы:
 
 ```
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ hdfs dfs -ls my_parquet_sink
