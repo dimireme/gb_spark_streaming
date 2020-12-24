@@ -148,7 +148,7 @@ stream.stop()
 Создаём временное окно. В структуру датафрейма добавился новый столбец.
 
 ```python
-windowed_iris = extended_iris.withColumn("window_time", F.window(F.col("receive_time"), "2 minute"))
+windowed_iris = extended_iris.withColumn("window_time", F.window(F.col("receive_time"), "2 minutes"))
 windowed_iris.printSchema()
 ```
 
@@ -168,7 +168,7 @@ windowed_iris.printSchema()
 Устанавливаем вотермарк для очистки чекпоинта и удаляем дубли в каждом окне.
 
 ```python
-waterwarked_windowed_iris = windowed_iris.withWatermark("window_time", "1 minute")
+waterwarked_windowed_iris = windowed_iris.withWatermark("window_time", "2 minutes")
 deduplicated_windowed_iris = waterwarked_windowed_iris \
     .drop_duplicates(["species", "window_time"])
 ```
@@ -238,7 +238,7 @@ stream.stop()
 
 ```python
 sliding_iris = extended_iris.withColumn("sliding_time", F.window(F.col("receive_time"), "1 minute", "30 seconds"))
-waterwarked_sliding_iris = sliding_iris.withWatermark("sliding_time", "2 minute")
+waterwarked_sliding_iris = sliding_iris.withWatermark("sliding_time", "2 minutes")
 deduplicated_sliding_iris = waterwarked_sliding_iris.drop_duplicates(["species", "sliding_time"])
 stream = console_output(deduplicated_sliding_iris , 20)
 ```
@@ -302,41 +302,130 @@ stream = console_output(deduplicated_sliding_iris , 20)
 stream.stop()
 ```
 
+1\.7\. OUTPUT MODES - считаем суммы
 
-#OUTPUT MODES - считаем суммы
+Переопределяем метод `console_output` так, чтобы можно было задавать режим вывода результата работы аггрегационных функций.
+
+```python
 def console_output(df, freq, out_mode):
     return df.writeStream.format("console") \
         .trigger(processingTime='%s seconds' % freq ) \
         .options(truncate=False) \
-        .option("checkpointLocation", "checkpoints/my_watermark_console_chk2") \
+        .option("checkpointLocation", "checkpoints/watermark_console_chk2") \
         .outputMode(out_mode) \
         .start()
+```
 
-count_orders = waterwarked_windowed_orders.groupBy("window_time").count()
-#пишем только обновляющиеся записи
-stream = console_output(count_orders , 20, "update")
+```python
+count_iris = waterwarked_windowed_iris.groupBy("window_time").count()
+```
+
+Пишем только обновляющиеся записи. Тут считатся `count` по каждому окну и выводятся записи только о тех окнах, в которых значение поменялось. 
+
+```python
+stream = console_output(count_iris , 20, "update")
 stream.stop()
+```
+    
+    -------------------------------------------                                     
+    Batch: 2
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2020-12-24 13:28:00, 2020-12-24 13:30:00]|18   |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 3
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2020-12-24 13:30:00, 2020-12-24 13:32:00]|6    |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 4
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2020-12-24 13:30:00, 2020-12-24 13:32:00]|12   |
+    +------------------------------------------+-----+
 
-#пишем все  записи
-stream = console_output(count_orders , 20, "complete")
+
+
+Пишем все  записи. Тут считается `count` по каждому окну и выводятся результаты подсчёта во всех окнах. 
+
+```python
+stream = console_output(count_iris , 20, "complete")
 stream.stop()
+```
+    
+    -------------------------------------------                                     
+    Batch: 5
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2020-12-24 13:34:00, 2020-12-24 13:36:00]|6    |
+    |[2020-12-24 13:32:00, 2020-12-24 13:34:00]|30   |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 6
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2020-12-24 13:34:00, 2020-12-24 13:36:00]|12   |
+    |[2020-12-24 13:32:00, 2020-12-24 13:34:00]|30   |
+    +------------------------------------------+-----+
 
-#пишем все записи только один раз
-stream = console_output(count_orders , 20, "append") #один раз в конце вотермарки
+
+
+Пишем все записи только один раз. Информация выводится один раз, когда окно заканчивается.
+
+```python
+stream = console_output(count_iris , 20, "append")
 stream.stop()
+```
 
-sliding_orders = waterwarked_sliding_orders.groupBy("sliding_time").count()
-#наблюдаем за суммами в плавающем окне
-stream = console_output(sliding_orders , 20, "update")
+// TODO: тут не увидел результата все батчи пустые.
+
+
+Наблюдаем за суммами в плавающем окне.
+
+```python
+sliding_iris = waterwarked_sliding_iris.groupBy("sliding_time").count()
+stream = console_output(sliding_iris , 20, "update")
 stream.stop()
+```
 
-
-
-
-
+    -------------------------------------------                                     
+    Batch: 1
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |sliding_time                              |count|
+    +------------------------------------------+-----+
+    |[2020-12-24 13:41:30, 2020-12-24 13:42:30]|12   |
+    |[2020-12-24 13:41:00, 2020-12-24 13:42:00]|12   |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 2
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |sliding_time                              |count|
+    +------------------------------------------+-----+
+    |[2020-12-24 13:42:00, 2020-12-24 13:43:00]|6    |
+    |[2020-12-24 13:41:30, 2020-12-24 13:42:30]|18   |
+    +------------------------------------------+-----+
 
 
 ##### Задание 2. Сджойнить стрим со статикой.
 
 
 ##### Задание 3. Сджойнить стрим со стримом.
+
