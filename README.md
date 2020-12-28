@@ -38,11 +38,11 @@
 Следующие записи эквивалентны:
 
 ```python
-park.readStream.option("sep", ";").schema(userSchema).csv("/path/to/directory")
+spark.readStream.option("sep", ";").schema(userSchema).csv("/path/to/directory")
 ```
 
 ```python
-park.readStream.option("sep", ";").schema(userSchema).format("csv").load("/path/to/directory")
+spark.readStream.option("sep", ";").schema(userSchema).format("csv").load("/path/to/directory")
 ```
 
 ##### Запись стрима
@@ -81,6 +81,7 @@ Cassandra k-v база,
 быстрое чтение, запись,
 масштабирование 
 
-
 HBase более консистентная БД
 Cassandra более доступная
+
+Возможность джойнить большие статические таблицы со стримом. 
