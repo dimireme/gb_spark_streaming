@@ -110,6 +110,24 @@ InvalidRequest: Error from server: code=2200 [Invalid query] message="unconfigur
 cqlsh:lesson7> exit;
 ```
 
+Проверим как выполняется `count` по большой таблице. 
+
+```bash
+cqlsh:lesson7> use keyspace1;
+cqlsh:keyspace1> SELECT table_name FROM system_schema.tables where keyspace_name = 'keyspace1';
+
+ table_name
+---------------
+       clients
+    users_many
+ users_unknown
+
+cqlsh:keyspace1> select count(*) from users_many;
+OperationTimedOut: errors={'10.0.0.18': 'Client request timeout. See Session.execute[_async](timeout)'}, last_host=10.0.0.18
+```
+
+Они не выполняются.
+
 ###### HBASE
 
 Тут повторим все те же операции для другой базы. 
@@ -201,5 +219,7 @@ ROW                                                               COLUMN+CELL
 
 ERROR: Unknown table lesson7:shadrin_animals!
 ```
+
+В HBase нету большой таблички, поэтому проверить, выполняется ли count, проверить не сможем. 
 
 ##### Задание 2. Когда cassandra станет понятна, поработать с ней через Spark. Проверить пушит ли спарк фильтры в касандру.
