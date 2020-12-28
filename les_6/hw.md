@@ -330,7 +330,7 @@ cass_big_df.filter(F.col("user_id")=="3999638244").show()
 
 ##### Задание 3. Проверить пушит ли спарк фильтры в касандру.
 
-Определяем функцию `explain`, которая будет показывать план запроса.
+Метод `explain`, который показывает логический и физический план запроса. Так как нас интересует только физический план, то будем пользоваться методом `.explain()` у датафрейма. 
 
 ```python
 def explain(self, extended=True):
@@ -340,31 +340,61 @@ def explain(self, extended=True):
         print(self._jdf.queryExecution().simpleString())
 ```
 
+Проверим что находится в PushedFilters в физическом плане при разных запросах.
 
+Запрос 1:
+```python
+cass_big_df.filter(F.col("user_id")=="10").explain()
+```
 
-#Наблюдаем на pushedFilter в PhysicalPlan
-explain(cass_big_df.filter(F.col("user_id")=="10"))
+    == Physical Plan ==
+    *(1) Filter isnotnull(user_id#49)
+    +- *(1) Scan org.apache.spark.sql.cassandra.CassandraSourceRelation@12da56e7 [user_id#49,gender#50] PushedFilters: [IsNotNull(user_id), *EqualTo(user_id,10)], ReadSchema: struct<user_id:string,gender:string>
 
-explain(cass_big_df.filter(F.col("gender")=="10"))
+Запрос 2:
+```python
+cass_big_df.filter(F.col("gender")=="10").explain()
+```
 
-#between не передается в pushdown
+    == Physical Plan ==
+    *(1) Filter (isnotnull(gender#50) && (gender#50 = 10))
+    +- *(1) Scan org.apache.spark.sql.cassandra.CassandraSourceRelation@12da56e7 [user_id#49,gender#50] PushedFilters: [IsNotNull(gender), EqualTo(gender,10)], ReadSchema: struct<user_id:string,gender:string>
+
+Оба запроса спускают фильтр до уровня базы. Фильтр по ключу сделается быстро, первый запрос оптимальный. Фильтр по колонке `gender` в кассандре будет выполняться долго, второй запрос не оптимальный. Но если вызывать метод `.show()` у датафрейма, к запросу будет добавлен `limit=20` и всё-таки второй запрос так же выполнится.
+
+Сделаем представлеине `cass_df` датафрейма `cass_big_df`, чтобы обращаться к нему внутри SQL-выражений. 
+
+```python
 cass_big_df.createOrReplaceTempView("cass_df")
-sql_select = spark.sql("""
+```
+
+Запрос 3:
+
+```python
+spark.sql("""
 select * 
 from cass_df
 where user_id between 1999 and 2000
-""")
-#проверяем, что user id не попал в pushedFilter
-explain(sql_select)
-sql_select.show() #медленно
+""").explain()
+```
 
-#in передается в pushdown
+    == Physical Plan ==
+    *(1) Filter (((cast(user_id#49 as int) >= 1999) && (cast(user_id#49 as int) <= 2000)) && isnotnull(user_id#49))
+    +- *(1) Scan org.apache.spark.sql.cassandra.CassandraSourceRelation@12da56e7 [user_id#49,gender#50] PushedFilters: [IsNotNull(user_id)], ReadSchema: struct<user_id:string,gender:string>
+
+В PushedFilters нет фильтрации по ключам (от 1999 до 2000). Значит спарк вычитает всю базу и сам будет отфильтровывать записи. Спарк делает фильтрацию по ключу гораздо дольше чем кассандра, поэтому запрос не оптимальныЙ. Перепишем его.
+
+Запрос 4:
+
+```python
 sql_select = spark.sql("""
 select * 
 from cass_df
 where user_id in (3884632855,3562535987)
-""")
+""").explain()
+```
 
-#проверяем, что user id попал в pushedFilter
-explain(sql_select)
-sql_select.show() #быстро
+    == Physical Plan ==
+    *(1) Scan org.apache.spark.sql.cassandra.CassandraSourceRelation@12da56e7 [user_id#49,gender#50] PushedFilters: [*In(user_id, [3884632855,3562535987])], ReadSchema: struct<user_id:string,gender:string>
+
+В PushedFilters есть фильтр по ключам. Запрос оптимальный.
