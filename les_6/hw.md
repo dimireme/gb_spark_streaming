@@ -218,8 +218,153 @@ hbase(main):020:0> scan 'lesson7:shadrin_animals'
 ROW                                                               COLUMN+CELL
 
 ERROR: Unknown table lesson7:shadrin_animals!
+
+hbase(main):021:0> exit
 ```
 
 В HBase нету большой таблички, поэтому проверить, выполняется ли count, проверить не сможем. 
 
-##### Задание 2. Когда cassandra станет понятна, поработать с ней через Spark. Проверить пушит ли спарк фильтры в касандру.
+##### Задание 2. Когда cassandra станет понятна, поработать с ней через Spark.
+
+Запускаем pyspark с указанием библиотеки для работы с cassandra.
+
+```bash
+[BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ export SPARK_KAFKA_VERSION=0.10
+[BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /spark2.4/bin/pyspark --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5,com.datastax.spark:spark-cassandra-connector_2.11:2.4.2 --driver-memory 512m --driver-cores 1 --master local[1]
+```
+
+Делаем стандартные импорты и читаем табличку `lesson7.animals`. В формате чтения указываем коннектор к базе данных cassandra. Параметры подключения к БД заданы в конфигах pyspark, поэтому здесь их не указываем.
+
+```python
+from pyspark.sql.types import StructType, StringType, IntegerType, TimestampType
+from pyspark.sql import functions as F
+
+cass_animals_df = spark.read \
+    .format("org.apache.spark.sql.cassandra") \
+    .options(table="animals", keyspace="lesson7") \
+    .load()
+
+cass_animals_df.printSchema()
+```
+
+    root
+     |-- id: integer (nullable = true)
+     |-- name: string (nullable = true)
+     |-- size: string (nullable = true)
+
+
+Посмотрим, что есть в таблице: 
+
+```python
+cass_animals_df.show()
+```
+
+    +---+--------------+-----+                                                      
+    | id|          name| size|
+    +---+--------------+-----+
+    |  5|         Snake| null|
+    | 11|          Bull|Bddig|
+    |  8|          Flea|small|
+    |  2|          Doom| null|
+    |  3|           Doe| null|
+    |  4|Justice League|Small|
+    +---+--------------+-----+
+
+Создадим запись с ключем 11 и добавим её в таблицу.
+
+```python
+cow_df = spark.sql("""select 11 as id, "Cow" as name, "Big" as size """)
+cow_df.show()
+```
+
+    +---+----+----+
+    | id|name|size|
+    +---+----+----+
+    | 11| Cow| Big|
+    +---+----+----+
+
+Добавляем с указанием режима `append`.
+
+```python
+cow_df.write \
+    .format("org.apache.spark.sql.cassandra") \
+    .options(table="animals", keyspace="lesson7") \
+    .mode("append") \
+    .save()
+
+cass_animals_df.show()
+```
+
+    +---+--------------+-----+
+    | id|          name| size|
+    +---+--------------+-----+
+    |  5|         Snake| null|
+    | 11|           Cow|  Big|
+    |  8|          Flea|small|
+    |  2|          Doom| null|
+    |  3|           Doe| null|
+    |  4|Justice League|Small|
+    +---+--------------+-----+
+    
+Не смотря на то что при записи указывался режим `append`, фактически был произведён `update` записи, так как такой ключ уже существовал в таблице.
+
+Теперь прочитаем большой большой датасет по ключу.
+
+```python
+cass_big_df = spark.read \
+    .format("org.apache.spark.sql.cassandra") \
+    .options(table="users_many", keyspace="keyspace1") \
+    .load()
+
+cass_big_df.filter(F.col("user_id")=="3999638244").show()
+```
+
+    +----------+------+
+    |   user_id|gender|
+    +----------+------+
+    |3999638244|     3|
+    +----------+------+
+
+Запрос `cass_big_df.filter(F.col("gender")=="1").count()` не выполнится, так как требует прочтения всей таблицы. Это очень дорогая операция.
+
+
+##### Задание 3. Проверить пушит ли спарк фильтры в касандру.
+
+Определяем функцию `explain`, которая будет показывать план запроса.
+
+```python
+def explain(self, extended=True):
+    if extended:
+        print(self._jdf.queryExecution().toString())
+    else:
+        print(self._jdf.queryExecution().simpleString())
+```
+
+
+
+#Наблюдаем на pushedFilter в PhysicalPlan
+explain(cass_big_df.filter(F.col("user_id")=="10"))
+
+explain(cass_big_df.filter(F.col("gender")=="10"))
+
+#between не передается в pushdown
+cass_big_df.createOrReplaceTempView("cass_df")
+sql_select = spark.sql("""
+select * 
+from cass_df
+where user_id between 1999 and 2000
+""")
+#проверяем, что user id не попал в pushedFilter
+explain(sql_select)
+sql_select.show() #медленно
+
+#in передается в pushdown
+sql_select = spark.sql("""
+select * 
+from cass_df
+where user_id in (3884632855,3562535987)
+""")
+
+#проверяем, что user id попал в pushedFilter
+explain(sql_select)
+sql_select.show() #быстро
