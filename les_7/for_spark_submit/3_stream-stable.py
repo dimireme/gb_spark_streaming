@@ -4,9 +4,11 @@ from pyspark.sql.types import StructType, StringType
 import datetime
 
 spark = SparkSession.builder.appName("shadrin_spark").getOrCreate()
+
 schema = StructType() \
-    .add("product_category_name", StringType()) \
-    .add("product_category_name_english", StringType())
+    .add("President", StringType()) \
+    .add("Took_office", StringType()) \
+    .add("Left_office", StringType())
 
 raw_files = spark \
     .readStream \
@@ -30,7 +32,7 @@ def foreach_batch_function(df, epoch_id):
         .parquet("my_submit_parquet_files/p_date=" + str(load_time))
     print("FINISHED BATCH LOADING. TIME = " + load_time)
 
-stream = file_sink(raw_files,10)
+stream = file_sink(raw_files, 10)
 
 while(True):
     print("I'M STILL ALIVE")
