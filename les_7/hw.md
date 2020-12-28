@@ -10,6 +10,7 @@
 <details>
 <summary>Для истории, пример запуска spark-submit с параметрами</summary>
 
+```
 spark-submit --conf spark.hadoop.hive.exec.max.dynamic.partitions=10000 \
 --conf spark.hadoop.hive.exec.max.dynamic.partitions.pernode=3000 \
 --conf spark.hadoop.hive.exec.dynamic.partition.mode=nonstrict \
@@ -32,4 +33,6 @@ spark-submit --conf spark.hadoop.hive.exec.max.dynamic.partitions=10000 \
 --conf spark.sql.shuffle.partitions=300 \
 --conf spark.shuffle.service.enabled=true \
 my_script.py
+```
+
 </details>
