@@ -5,17 +5,19 @@
 
 [Урок 1. Spark Streaming. Тестовые стримы.](/les_1/README.md)
 
-[Урок 2. Kafka. Архитектура.](/les_2/hw.md) 
+[Урок 2. Kafka. Архитектура.](/les_2/README.md) 
 
-[Урок 3. Spark Streaming. Чтение Kafka, чтение файлов в реальном времени.](/les_3/hw.md)
+[Урок 3. Spark Streaming. Чтение Kafka, чтение файлов в реальном времени.](/les_3/README.md)
 
-[Урок 4. Spark Streaming. Sinks.](/les_4/hw.md)
+[Урок 4. Spark Streaming. Sinks.](/les_4/README.md)
 
-[Урок 5. Spark Streaming. Stateful streams.](/les_5/hw.md)
+[Урок 5. Spark Streaming. Stateful streams.](/les_5/README.md)
 
-[Урок 6. Spark Streaming. Cassandra.](/les_6/hw.md)
+[Урок 6. Spark Streaming. Cassandra.](/les_6/README.md)
 
-[Урок 7. Spark Submit. Lambda архитектура.](/les_7/hw.md)
+[Урок 7. Spark Submit. Lambda архитектура.](/les_7/README.md)
+
+[Урок 8. Spark Streaming + Spark ML + Cassandra. Применение ML-модели в режиме реального времени.](/les_8/README.md)
 
 ### Документация
 
