@@ -15,6 +15,8 @@
 
 [Урок 6. Spark Streaming. Cassandra.](/les_6/hw.md)
 
+[Урок 7. Spark submit. Lambda архитектура.](/les_7/hw.md)
+
 ### Документация
 
 [Structured Streaming](https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html)
