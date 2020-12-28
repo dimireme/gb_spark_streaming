@@ -3,12 +3,13 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import StructType, StringType
 import datetime
 
-spark = SparkSession.builder.appName("gogin_spark").getOrCreate()
-schema = StructType() \
-    .add("product_category_name", StringType()) \
-    .add("product_category_name_english", StringType())
+spark = SparkSession.builder.appName("shadrin_spark").getOrCreate()
 
-#читаем все csv в батче
+schema = StructType() \
+    .add("President", StringType()) \
+    .add("Took_office", StringType()) \
+    .add("Left_office", StringType())
+
 raw_files = spark \
     .read \
     .format("csv") \
@@ -16,11 +17,9 @@ raw_files = spark \
     .options(path="input_csv_for_stream", header=True) \
     .load()
 
-#fix timestamp
 load_time = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 print("START BATCH LOADING. TIME = " + load_time)
 
-#пишем паркеты в партиции
 raw_files.withColumn("p_date", F.lit("load_time")) \
     .write \
     .mode("append") \
