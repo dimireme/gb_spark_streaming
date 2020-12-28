@@ -149,7 +149,7 @@ hbase shell
 ```bash
 hbase(main):006:0> create 'lesson7:shadrin_animals', 'name', 'size'
 Created table lesson7:shadrin_animals
-Took 1.4840 seconds                                                                                                                                                                                                                                              
+Took 1.4840 seconds
 => Hbase::Table - lesson7:shadrin_animals
 ```
 
