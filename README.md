@@ -15,7 +15,7 @@
 
 [Урок 6. Spark Streaming. Cassandra.](/les_6/hw.md)
 
-[Урок 7. Spark submit. Lambda архитектура.](/les_7/hw.md)
+[Урок 7. Spark Submit. Lambda архитектура.](/les_7/hw.md)
 
 ### Документация
 

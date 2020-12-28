@@ -1,4 +1,4 @@
-## Урок 7. Spark submit. Lambda архитектура.
+## Урок 7. Spark Submit. Lambda архитектура.
 
 ##### Задание. Повторить запуск Spark приложений с такими параметрами (можно еще добавлять свои):
  
@@ -78,7 +78,7 @@ drwxr-xr-x   - BD_274_ashadrin BD_274_ashadrin          0 2020-12-28 04:15 my_su
 ``````
 
 <details>
-<summary>Для истории. Пример запуска spark-submit с параметрами</summary>
+<summary>Для истории. Пример запуска spark-submit с параметрами.</summary>
 
 ```
 spark-submit --conf spark.hadoop.hive.exec.max.dynamic.partitions=10000 \
