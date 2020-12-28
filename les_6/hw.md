@@ -110,5 +110,96 @@ InvalidRequest: Error from server: code=2200 [Invalid query] message="unconfigur
 cqlsh:lesson7> exit;
 ```
 
+###### HBASE
+
+Тут повторим все те же операции для другой базы. 
+
+Пришлось переподключится к worker-0, так как на втором заканчивалась память и с HBase там поработать не получилось.
+
+```bash
+ssh BD_274_ashadrin@89.208.223.141 -i ~/.ssh/id_rsa_gb_spark
+```
+
+Запускаем консольный клиент:
+
+```bash
+hbase shell
+```
+
+Создаём новую табличку:
+
+```bash
+hbase(main):006:0> create 'lesson7:shadrin_animals', 'name', 'size'
+Created table lesson7:shadrin_animals
+Took 1.4840 seconds                                                                                                                                                                                                                                              
+=> Hbase::Table - lesson7:shadrin_animals
+```
+
+Вставка записи:
+
+```bash
+hbase(main):007:0> put 'lesson7:shadrin_animals', '3', 'name', 'Deer'
+Took 0.1339 seconds                                                   
+hbase(main):008:0> put 'lesson7:shadrin_animals', '3', 'size', 'Big'
+Took 0.0449 seconds   
+hbase(main):009:0> scan 'lesson7:shadrin_animals'
+ROW                                                               COLUMN+CELL                 
+ 3                                                                column=name:, timestamp=1609115122292, value=Deer
+ 3                                                                column=size:, timestamp=1609115150780, value=Big
+1 row(s)
+Took 0.0123 seconds  
+```
+
+Апдейт записи с `id = 3`:
+
+```bash
+hbase(main):010:0> put 'lesson7:shadrin_animals', '3', 'name', 'Doe'
+Took 0.0178 seconds
+hbase(main):011:0> scan 'lesson7:shadrin_animals'
+ROW                                                               COLUMN+CELL
+ 3                                                                column=name:, timestamp=1609115487679, value=Doe
+ 3                                                                column=size:, timestamp=1609115150780, value=Big
+1 row(s)
+Took 0.0213 seconds  
+```
+
+Вставка ещё одной записи:
+
+```bash
+hbase(main):012:0> put 'lesson7:shadrin_animals', '5', 'name', 'Snake'
+Took 0.0128 seconds
+hbase(main):013:0> scan 'lesson7:shadrin_animals'
+ROW                                                               COLUMN+CELL
+ 3                                                                column=name:, timestamp=1609115487679, value=Doe
+ 3                                                                column=size:, timestamp=1609115150780, value=Big
+ 5                                                                column=name:, timestamp=1609115573124, value=Snake
+2 row(s)
+Took 0.0107 seconds  
+```
+
+Удаление всех колонок по ключу:
+
+```bash
+hbase(main):016:0> deleteall 'lesson7:shadrin_animals', '3'
+Took 0.0083 seconds
+hbase(main):017:0> scan 'lesson7:shadrin_animals'
+ROW                                                               COLUMN+CELL
+ 5                                                                column=name:, timestamp=1609115573124, value=Snake
+1 row(s)
+Took 0.0336 seconds 
+```
+
+В конце удалим табличку:
+
+```bash
+hbase(main):018:0> disable 'lesson7:shadrin_animals'
+Took 2.4847 seconds
+hbase(main):019:0> drop 'lesson7:shadrin_animals'
+Took 1.4006 seconds
+hbase(main):020:0> scan 'lesson7:shadrin_animals'
+ROW                                                               COLUMN+CELL
+
+ERROR: Unknown table lesson7:shadrin_animals!
+```
 
 ##### Задание 2. Когда cassandra станет понятна, поработать с ней через Spark. Проверить пушит ли спарк фильтры в касандру.
