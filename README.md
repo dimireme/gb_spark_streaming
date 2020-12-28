@@ -3,7 +3,7 @@
 ### Список занятий
 
 
-[Урок 1. Spark Streaming. Тестовые стримы.](/les_1/hw.md)
+[Урок 1. Spark Streaming. Тестовые стримы.](/les_1/README.md)
 
 [Урок 2. Kafka. Архитектура.](/les_2/hw.md) 
 
