@@ -686,26 +686,23 @@ stream.stop()
 
 ##### Задание 3. Сджойнить стрим со стримом.
 
-raw_rate = spark \
-    .readStream \
-    .format("rate") \
-    .load()
+Это задание сделаем на примере датасетов товаров и заказов.
 
+Датасет, соотносящий товары и заказы читаем из кафки, топик `order_items`.
 
-
-
-
-// ==========================================
-
+```python
 raw_orders_items = spark.readStream. \
     format("kafka"). \
     option("kafka.bootstrap.servers", kafka_brokers). \
     option("subscribe", "order_items"). \
     option("startingOffsets", "earliest"). \
     load()
+```
 
-##разбираем value
-schema_items = StructType() \
+Разбираем value и добавляем окно.
+
+```python
+schema_orders_items = StructType() \
     .add("order_id", StringType()) \
     .add("order_item_id", StringType()) \
     .add("product_id", StringType()) \
@@ -715,29 +712,87 @@ schema_items = StructType() \
     .add("freight_value", StringType())
 
 extended_orders_items = raw_orders_items \
-    .select(F.from_json(F.col("value").cast("String"), schema_items).alias("value")) \
+    .select(F.from_json(F.col("value").cast("String"), schema_orders_items).alias("value")) \
     .select("value.*") \
     .withColumn("order_items_receive_time", F.current_timestamp()) \
-    .withColumn("window_time",F.window(F.col("order_items_receive_time"),"10 minute"))
+    .withColumn("window_time",F.window(F.col("order_items_receive_time"),"2 minutes"))
 
 extended_orders_items.printSchema()
+```
+
+    root
+     |-- order_id: string (nullable = true)
+     |-- order_item_id: string (nullable = true)
+     |-- product_id: string (nullable = true)
+     |-- seller_id: string (nullable = true)
+     |-- shipping_limit_date: string (nullable = true)
+     |-- price: string (nullable = true)
+     |-- freight_value: string (nullable = true)
+     |-- order_items_receive_time: timestamp (nullable = false)
+     |-- window_time: struct (nullable = false)
+     |    |-- start: timestamp (nullable = true)
+     |    |-- end: timestamp (nullable = true)
 
 
-windowed_orders = extended_orders.withColumn("window_time",F.window(F.col("order_receive_time"),"10 minute"))
-waterwarked_windowed_orders = windowed_orders.withWatermark("window_time", "10 minute")
+Датасет списка заказов читаем из кафки, топик `orders_json`.
+
+```python
+raw_orders = spark.readStream. \
+    format("kafka"). \
+    option("kafka.bootstrap.servers", kafka_brokers). \
+    option("subscribe", "orders_json"). \
+    option("maxOffsetsPerTrigger", "5"). \
+    option("startingOffsets", "earliest"). \
+    load()
+```
+
+Разбираем value, добавляем колонку со временем получения сообщения,создаём по ней окно и добавляем вотермарку.
+
+```python
+schema = StructType() \
+    .add("order_id", StringType()) \
+    .add("customer_id", StringType()) \
+    .add("order_status", StringType()) \
+    .add("order_purchase_timestamp", StringType()) \
+    .add("order_approved_at", StringType()) \
+    .add("order_delivered_carrier_date", StringType()) \
+    .add("order_delivered_customer_date", StringType()) \
+    .add("order_estimated_delivery_date", StringType())
+
+waterwarked_windowed_orders = raw_orders \
+    .select(F.from_json(F.col("value").cast("String"), schema).alias("value"), "offset") \
+    .select("value.order_id", "value.order_status", "value.order_purchase_timestamp") \
+    .withColumn("order_receive_time", F.current_timestamp()) \
+    .withColumn("window_time",F.window(F.col("order_receive_time"),"2 minutes")) \
+    .withWatermark("window_time", "2 minutes")
+    
+waterwarked_windowed_orders.printSchema()
+```
+
+    root
+     |-- order_id: string (nullable = true)
+     |-- order_status: string (nullable = true)
+     |-- order_purchase_timestamp: string (nullable = true)
+     |-- order_receive_time: timestamp (nullable = false)
+     |-- window_time: struct (nullable = false)
+     |    |-- start: timestamp (nullable = true)
+     |    |-- end: timestamp (nullable = true)
 
 
+Делаем джойн двух датасетов. 
+
+```python
 streams_joined = waterwarked_windowed_orders \
     .join(extended_orders_items, ["order_id", "window_time"] , "inner") \
     .select("order_id", "order_item_id", "product_id", "window_time")
+```
 
-stream = console_output(streams_joined , 20, "update") #не сработает для inner
+Тип отображения `update`не подходит для `inner` джойна.
+
+```python
 stream = console_output(streams_joined , 20, "append")
 stream.stop()
+```
 
-streams_joined = waterwarked_windowed_orders \
-    .join(extended_orders_items, ["order_id", "window_time"] , "left") \
-    .select("order_id", "order_item_id", "product_id", "window_time")
+Здесь не увидел результата, так как в топике `order_items` не было данных. По факту этот топик вычитывается целиком за раз, поэтому в первом окне можно наблюдать микробатчи сджойненого датасета. Для остальных окон микробатчи пустые, так как `window_time` уже различаются. Из топика `order_items` новые данные не приходят.
 
-stream = console_output(streams_joined , 20, "update")
-stream.stop()
