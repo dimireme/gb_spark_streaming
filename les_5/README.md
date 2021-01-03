@@ -386,16 +386,41 @@ def console_output(df, freq, out_mode):
         .start()
 ```
 
+Используем ранее созданный датафрейм с вотермаркой на 2 минуты. Группируем данные по нескользящему окну `window_time`. 
+
 ```python
 count_iris = waterwarked_windowed_iris.groupBy("window_time").count()
 ```
 
-Пишем только обновляющиеся записи. Тут считатся `count` по каждому окну и выводятся записи только о тех окнах, в которых значение поменялось. 
+Перед каждым запуском очищаем чекпойнт командой `hdfs dfs -rm -r checkpoints/watermark_console_chk2`.
+
+###### update
 
 ```python
 stream = console_output(count_iris , 20, "update")
 stream.stop()
 ```
+
+<summary>
+<details>Результат выполнения в консоли</details>
+
+    -------------------------------------------                                     
+    Batch: 0
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2021-01-02 20:00:00, 2021-01-02 20:02:00]|6    |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 1
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2021-01-02 20:02:00, 2021-01-02 20:04:00]|6    |
+    +------------------------------------------+-----+
     
     -------------------------------------------                                     
     Batch: 2
@@ -403,7 +428,7 @@ stream.stop()
     +------------------------------------------+-----+
     |window_time                               |count|
     +------------------------------------------+-----+
-    |[2020-12-24 13:28:00, 2020-12-24 13:30:00]|18   |
+    |[2021-01-02 20:02:00, 2021-01-02 20:04:00]|12   |
     +------------------------------------------+-----+
     
     -------------------------------------------                                     
@@ -412,7 +437,61 @@ stream.stop()
     +------------------------------------------+-----+
     |window_time                               |count|
     +------------------------------------------+-----+
-    |[2020-12-24 13:30:00, 2020-12-24 13:32:00]|6    |
+    |[2021-01-02 20:02:00, 2021-01-02 20:04:00]|18   |
+    +------------------------------------------+-----+
+
+</summary>
+
+В режиме `.outputMode("update")` в консоль пишутся только обновляющиеся записи. Считатся `count` по каждому окну и выводятся записи только о тех окнах, в которых значение поменялось. 
+
+
+###### complete
+
+```python
+stream = console_output(count_iris , 20, "complete")
+stream.stop()
+```
+
+<summary>
+<details>Результат выполнения в консоли</details>
+
+    -------------------------------------------                                     
+    Batch: 0
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2021-01-02 20:12:00, 2021-01-02 20:14:00]|6    |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 1
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2021-01-02 20:14:00, 2021-01-02 20:16:00]|6    |
+    |[2021-01-02 20:12:00, 2021-01-02 20:14:00]|6    |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 2
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2021-01-02 20:14:00, 2021-01-02 20:16:00]|12   |
+    |[2021-01-02 20:12:00, 2021-01-02 20:14:00]|6    |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 3
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2021-01-02 20:14:00, 2021-01-02 20:16:00]|18   |
+    |[2021-01-02 20:12:00, 2021-01-02 20:14:00]|6    |
     +------------------------------------------+-----+
     
     -------------------------------------------                                     
@@ -421,17 +500,9 @@ stream.stop()
     +------------------------------------------+-----+
     |window_time                               |count|
     +------------------------------------------+-----+
-    |[2020-12-24 13:30:00, 2020-12-24 13:32:00]|12   |
+    |[2021-01-02 20:14:00, 2021-01-02 20:16:00]|24   |
+    |[2021-01-02 20:12:00, 2021-01-02 20:14:00]|6    |
     +------------------------------------------+-----+
-
-
-
-Пишем все  записи. Тут считается `count` по каждому окну и выводятся результаты подсчёта во всех окнах. 
-
-```python
-stream = console_output(count_iris , 20, "complete")
-stream.stop()
-```
     
     -------------------------------------------                                     
     Batch: 5
@@ -439,8 +510,8 @@ stream.stop()
     +------------------------------------------+-----+
     |window_time                               |count|
     +------------------------------------------+-----+
-    |[2020-12-24 13:34:00, 2020-12-24 13:36:00]|6    |
-    |[2020-12-24 13:32:00, 2020-12-24 13:34:00]|30   |
+    |[2021-01-02 20:14:00, 2021-01-02 20:16:00]|30   |
+    |[2021-01-02 20:12:00, 2021-01-02 20:14:00]|6    |
     +------------------------------------------+-----+
     
     -------------------------------------------                                     
@@ -449,11 +520,27 @@ stream.stop()
     +------------------------------------------+-----+
     |window_time                               |count|
     +------------------------------------------+-----+
-    |[2020-12-24 13:34:00, 2020-12-24 13:36:00]|12   |
-    |[2020-12-24 13:32:00, 2020-12-24 13:34:00]|30   |
+    |[2021-01-02 20:14:00, 2021-01-02 20:16:00]|36   |
+    |[2021-01-02 20:12:00, 2021-01-02 20:14:00]|6    |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 7
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |window_time                               |count|
+    +------------------------------------------+-----+
+    |[2021-01-02 20:14:00, 2021-01-02 20:16:00]|36   |
+    |[2021-01-02 20:12:00, 2021-01-02 20:14:00]|6    |
+    |[2021-01-02 20:16:00, 2021-01-02 20:18:00]|6    |
     +------------------------------------------+-----+
 
+</summary>
+    
+В режиме `.outputMode("complete")` в консоль пишутся все  записи. Считается `count` по каждому окну и выводятся результаты подсчёта во всех окнах. 
 
+
+###### append
 
 Пишем все записи только один раз. Информация выводится один раз, когда окно заканчивается.
 
@@ -462,10 +549,10 @@ stream = console_output(count_iris , 20, "append")
 stream.stop()
 ```
 
-// TODO: тут не увидел результата все батчи пустые.
+Тут не увидел результата все батчи пустые. Скорее всего данный режим не поддерживается для данной аггрегирующей функции.
 
 
-Наблюдаем за суммами в плавающем окне.
+1\.8\. Наблюдаем за суммами в плавающем окне.
 
 ```python
 sliding_iris = waterwarked_sliding_iris.groupBy("sliding_time").count()
@@ -473,14 +560,27 @@ stream = console_output(sliding_iris , 20, "update")
 stream.stop()
 ```
 
+<summary>
+<details>Результат выполнения в консоли</details>
+
+    -------------------------------------------                                     
+    Batch: 0
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |sliding_time                              |count|
+    +------------------------------------------+-----+
+    |[2021-01-02 21:09:00, 2021-01-02 21:10:00]|6    |
+    |[2021-01-02 21:09:30, 2021-01-02 21:10:30]|6    |
+    +------------------------------------------+-----+
+    
     -------------------------------------------                                     
     Batch: 1
     -------------------------------------------
     +------------------------------------------+-----+
     |sliding_time                              |count|
     +------------------------------------------+-----+
-    |[2020-12-24 13:41:30, 2020-12-24 13:42:30]|12   |
-    |[2020-12-24 13:41:00, 2020-12-24 13:42:00]|12   |
+    |[2021-01-02 21:09:00, 2021-01-02 21:10:00]|12   |
+    |[2021-01-02 21:09:30, 2021-01-02 21:10:30]|12   |
     +------------------------------------------+-----+
     
     -------------------------------------------                                     
@@ -489,13 +589,155 @@ stream.stop()
     +------------------------------------------+-----+
     |sliding_time                              |count|
     +------------------------------------------+-----+
-    |[2020-12-24 13:42:00, 2020-12-24 13:43:00]|6    |
-    |[2020-12-24 13:41:30, 2020-12-24 13:42:30]|18   |
+    |[2021-01-02 21:10:00, 2021-01-02 21:11:00]|6    |
+    |[2021-01-02 21:09:30, 2021-01-02 21:10:30]|18   |
+    +------------------------------------------+-----+
+    
+    -------------------------------------------                                     
+    Batch: 3
+    -------------------------------------------
+    +------------------------------------------+-----+
+    |sliding_time                              |count|
+    +------------------------------------------+-----+
+    |[2021-01-02 21:10:00, 2021-01-02 21:11:00]|12   |
+    |[2021-01-02 21:10:30, 2021-01-02 21:11:30]|6    |
     +------------------------------------------+-----+
 
+</summary>
+
+Наблюдаем только обновляющиеся записи в каждом плавающем окне. 
 
 ##### Задание 2. Сджойнить стрим со статикой.
+
+Создадим статический датафрейм, который будет расширять исходный датасет ирисов.
+
+```python
+static_df_schema = StructType() \
+    .add("species", StringType()) \
+    .add("description", StringType())
+    
+static_df_data = (
+    ("setosa", "Iris setosa has a deep violet blue flower. The sepals are deeply-veined dark purple with a yellow-white signal."),
+    ("versicolor", "Iris versicolor is a flowering herbaceous perennial plant, growing 10-80 cm high. The well developed blue flower has 6 petals and sepals spread out nearly flat and have two forms."),
+    ("virginica", "Iris virginica is a perennial plant. The plant has 2 to 4 erect or arching, bright green, lance-shaped leaves that are flattened into one plane at the base.")
+)
+
+static_df = spark.createDataFrame(static_df_data, static_df_schema)
+```
+
+```python
+static_joined = waterwarked_iris.join(static_df, "species", "left")
+static_joined.isStreaming
+```
+
+    True
+    
+После джойна стрима со статикой получаем стрим. 
+    
+```python
+static_joined.printSchema()
+```
+
+    root
+     |-- species: string (nullable = true)
+     |-- sepalLength: float (nullable = true)
+     |-- sepalWidth: float (nullable = true)
+     |-- petalLength: float (nullable = true)
+     |-- petalWidth: float (nullable = true)
+     |-- offset: long (nullable = true)
+     |-- receive_time: timestamp (nullable = false)
+     |-- description: string (nullable = true)
+
+Добавлась колонка `description`.
+
+```python
+stream = console_output(static_joined , 20, "update")
+stream.stop()
+```
+
+    -------------------------------------------                                     
+    Batch: 0
+    -------------------------------------------
+    +----------+-----------+----------+-----------+----------+------+-----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |species   |sepalLength|sepalWidth|petalLength|petalWidth|offset|receive_time           |description                                                                                                                                                                        |
+    +----------+-----------+----------+-----------+----------+------+-----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |virginica |6.3        |2.8       |5.1        |1.5       |0     |2021-01-03 06:35:25.794|Iris virginica is a perennial plant. The plant has 2 to 4 erect or arching, bright green, lance-shaped leaves that are flattened into one plane at the base.                       |
+    |versicolor|6.3        |3.3       |4.7        |1.6       |1     |2021-01-03 06:35:25.794|Iris versicolor is a flowering herbaceous perennial plant, growing 10-80 cm high. The well developed blue flower has 6 petals and sepals spread out nearly flat and have two forms.|
+    |versicolor|5.6        |2.5       |3.9        |1.1       |3     |2021-01-03 06:35:25.794|Iris versicolor is a flowering herbaceous perennial plant, growing 10-80 cm high. The well developed blue flower has 6 petals and sepals spread out nearly flat and have two forms.|
+    |versicolor|5.7        |2.6       |3.5        |1.0       |5     |2021-01-03 06:35:25.794|Iris versicolor is a flowering herbaceous perennial plant, growing 10-80 cm high. The well developed blue flower has 6 petals and sepals spread out nearly flat and have two forms.|
+    |setosa    |5.0        |3.0       |1.6        |0.2       |2     |2021-01-03 06:35:25.794|Iris setosa has a deep violet blue flower. The sepals are deeply-veined dark purple with a yellow-white signal.                                                                    |
+    |setosa    |5.4        |3.9       |1.7        |0.4       |4     |2021-01-03 06:35:25.794|Iris setosa has a deep violet blue flower. The sepals are deeply-veined dark purple with a yellow-white signal.                                                                    |
+    +----------+-----------+----------+-----------+----------+------+-----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    
+    -------------------------------------------                                     
+    Batch: 1
+    -------------------------------------------
+    +----------+-----------+----------+-----------+----------+------+-----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |species   |sepalLength|sepalWidth|petalLength|petalWidth|offset|receive_time           |description                                                                                                                                                                        |
+    +----------+-----------+----------+-----------+----------+------+-----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+    |versicolor|6.1        |3.0       |4.6        |1.4       |7     |2021-01-03 06:35:40.004|Iris versicolor is a flowering herbaceous perennial plant, growing 10-80 cm high. The well developed blue flower has 6 petals and sepals spread out nearly flat and have two forms.|
+    |versicolor|6.3        |2.5       |4.9        |1.5       |9     |2021-01-03 06:35:40.004|Iris versicolor is a flowering herbaceous perennial plant, growing 10-80 cm high. The well developed blue flower has 6 petals and sepals spread out nearly flat and have two forms.|
+    |versicolor|4.9        |2.4       |3.3        |1.0       |10    |2021-01-03 06:35:40.004|Iris versicolor is a flowering herbaceous perennial plant, growing 10-80 cm high. The well developed blue flower has 6 petals and sepals spread out nearly flat and have two forms.|
+    |setosa    |5.7        |3.8       |1.7        |0.3       |6     |2021-01-03 06:35:40.004|Iris setosa has a deep violet blue flower. The sepals are deeply-veined dark purple with a yellow-white signal.                                                                    |
+    |setosa    |5.4        |3.4       |1.7        |0.2       |8     |2021-01-03 06:35:40.004|Iris setosa has a deep violet blue flower. The sepals are deeply-veined dark purple with a yellow-white signal.                                                                    |
+    |setosa    |5.1        |3.7       |1.5        |0.4       |11    |2021-01-03 06:35:40.004|Iris setosa has a deep violet blue flower. The sepals are deeply-veined dark purple with a yellow-white signal.                                                                    |
+    +----------+-----------+----------+-----------+----------+------+-----------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 
 ##### Задание 3. Сджойнить стрим со стримом.
 
+raw_rate = spark \
+    .readStream \
+    .format("rate") \
+    .load()
+
+
+
+
+
+// ==========================================
+
+raw_orders_items = spark.readStream. \
+    format("kafka"). \
+    option("kafka.bootstrap.servers", kafka_brokers). \
+    option("subscribe", "order_items"). \
+    option("startingOffsets", "earliest"). \
+    load()
+
+##разбираем value
+schema_items = StructType() \
+    .add("order_id", StringType()) \
+    .add("order_item_id", StringType()) \
+    .add("product_id", StringType()) \
+    .add("seller_id", StringType()) \
+    .add("shipping_limit_date", StringType()) \
+    .add("price", StringType()) \
+    .add("freight_value", StringType())
+
+extended_orders_items = raw_orders_items \
+    .select(F.from_json(F.col("value").cast("String"), schema_items).alias("value")) \
+    .select("value.*") \
+    .withColumn("order_items_receive_time", F.current_timestamp()) \
+    .withColumn("window_time",F.window(F.col("order_items_receive_time"),"10 minute"))
+
+extended_orders_items.printSchema()
+
+
+windowed_orders = extended_orders.withColumn("window_time",F.window(F.col("order_receive_time"),"10 minute"))
+waterwarked_windowed_orders = windowed_orders.withWatermark("window_time", "10 minute")
+
+
+streams_joined = waterwarked_windowed_orders \
+    .join(extended_orders_items, ["order_id", "window_time"] , "inner") \
+    .select("order_id", "order_item_id", "product_id", "window_time")
+
+stream = console_output(streams_joined , 20, "update") #не сработает для inner
+stream = console_output(streams_joined , 20, "append")
+stream.stop()
+
+streams_joined = waterwarked_windowed_orders \
+    .join(extended_orders_items, ["order_id", "window_time"] , "left") \
+    .select("order_id", "order_item_id", "product_id", "window_time")
+
+stream = console_output(streams_joined , 20, "update")
+stream.stop()
