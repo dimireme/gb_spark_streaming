@@ -23,7 +23,7 @@ def file_sink(df, freq):
     return df.writeStream.format("parquet") \
         .trigger(processingTime='%s seconds' % freq ) \
         .option("path", "my_submit_parquet_files/p_date=" + str(load_time)) \
-        .option("checkpointLocation", "checkpionts/my_parquet_checkpoint") \
+        .option("checkpointLocation", "checkpoints/my_parquet_checkpoint") \
         .start()
 
 timed_files = raw_files.withColumn("p_date", F.lit("load_time"))

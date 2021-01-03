@@ -20,7 +20,7 @@ raw_files = spark \
 def file_sink(df, freq):
     return df.writeStream.foreachBatch(foreach_batch_function) \
         .trigger(processingTime='%s seconds' % freq ) \
-        .option("checkpointLocation", "checkpionts/my_parquet_checkpoint") \
+        .option("checkpointLocation", "checkpoints/my_parquet_checkpoint") \
         .start()
 
 def foreach_batch_function(df, epoch_id):
