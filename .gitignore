@@ -3,3 +3,9 @@
 .idea
 
 venv
+
+# data for models
+/final_project/data/
+/dataframes/
+
+/final_project/.ipynb_*/
