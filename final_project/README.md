@@ -96,12 +96,13 @@ WITH REPLICATION = {
   };
 ```
 
-Создаём таблицу топ-5 самых популярных товаров. Тут будет только одна запись.
-```
-CREATE TABLE IF NOT EXISTS shadrin_final.top_5 (
-    name text,
-    list list<int>,
-    primary key (name)
+Создаём таблицу фичей товаров.
+```sql
+CREATE TABLE IF NOT EXISTS shadrin_final.item_features (
+    product_id int,
+    department text,
+    category text,
+    primary key (product_id)
 );
 ```
 
@@ -114,22 +115,62 @@ CREATE TABLE IF NOT EXISTS shadrin_final.own_purchases (
 );
 ```
 
+Создаём таблицу с бэйзлайнами. Тут будет две записи: топ 5 популярных покупок и 5 случайных товаров.
+```
+CREATE TABLE IF NOT EXISTS shadrin_final.baseline (
+    name text,
+    list list<int>,
+    primary key (name)
+);
+```
+
 ПРОСТО ПОЛЕЗНЫЕ КОМАНДЫ. TODO: удалить
 ```
 SELECT table_name FROM system_schema.tables WHERE keyspace_name = 'shadrin_final';
 
-SELECT * from shadrin_final.top_5;
-drop table shadrin_final.top_5;
+SELECT * from shadrin_final.item_features;
+drop table shadrin_final.item_features;
+
+SELECT * from shadrin_final.baseline;
+drop table shadrin_final.baseline;
 
 SELECT * from shadrin_final.own_purchases;
 drop table shadrin_final.own_purchases;
 ```
 
-Далее выполним код из файла `init_tables_n_topics.py`. Воспользуемся для этого новым терминалом. 
+Далее выполним код из файла `init_cassandra_tables.py`. Воспользуемся для этого новым терминалом. 
 
 TODO: добавить команды, которые копируют файл с кодом на кластер и запуск этого файла через spark-submit.
 
-В итоге получим заполненные таблички в Кассандре и топик в Кафке с тестовыми данными. 
+Проверяем как записались данные в Кассандру.
+```bash
+select * from shadrin_final.item_features where product_id = 818981;
+```
+
+     product_id | category    | department
+    ------------+-------------+------------
+         818981 | COLD CEREAL |    GROCERY
+
+```bash
+select * from shadrin_final.own_purchases where user_id = 2375;
+```
+Тут я обрезал вывод. Собственных покупок пользователей очень много.
+
+     user_id | item_id_list
+    ---------+--------------------------------
+        2375 | [828370, 827919, 997200, ... ]
+
+```bash
+select * from shadrin_final.baseline;
+```
+
+     name     | list
+    ----------+-----------------------------------------------
+     random_5 | [1185870, 1492723, 8019418, 894845, 12814320]
+        top_5 |   [995242, 1082185, 1127831, 5569230, 951590]
+
+
+В итоге получим заполненные таблички в Кассандре. 
 
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /spark2.4/bin/pyspark --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5,com.datastax.spark:spark-cassandra-connector_2.11:2.4.2 --driver-memory 512m --driver-cores 1 --master local[1]
