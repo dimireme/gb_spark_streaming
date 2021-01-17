@@ -177,7 +177,7 @@ select * from shadrin_final.baseline;
 <summary>Содержимое файла split_data.py.</summary>
 <pre>
 <code>
-\# coding=utf-8
+# coding=utf-8
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, IntegerType, FloatType
 from pyspark.sql import functions as F
@@ -207,11 +207,11 @@ train = train.orderBy(F.rand())
 test = test.orderBy(F.rand())
 
 
-######################################################################
-# Сохраняем train и test на HDFS в разные папки
-######################################################################
+\######################################################################
+\# Сохраняем train и test на HDFS в разные папки
+\######################################################################
 
-# на всякий случай
+\# на всякий случай
 subprocess.call(["hdfs", "dfs", "-rm", "-r", "for_topic"])
 subprocess.call(["hdfs", "dfs", "-rm", "-r", "for_train"])
 
@@ -219,16 +219,16 @@ test.repartition(1).write.csv("for_topic")
 train.repartition(1).write.csv("for_train")
 
 train.count()
-# 1188916
+\# 1188916
 
 test.count()
-# 1190432
+\# 1190432
 
-######################################################################
-# Записываем тестовые данные в топик shadrin_purchases
-######################################################################
+\######################################################################
+\# Записываем тестовые данные в топик shadrin_purchases
+\######################################################################
 
-# читаем файлы в стриме
+\# читаем файлы в стриме
 raw_files = spark \
     .readStream \
     .format("csv") \
@@ -236,10 +236,10 @@ raw_files = spark \
     .options(path="for_topic", header=False) \
     .load()
 
-# указываем одну из нод с кафкой
+\# указываем одну из нод с кафкой
 kafka_brokers = "bigdataanalytics-worker-0.novalocal:6667"
 
-# пишем стрим в Кафку
+\# пишем стрим в Кафку
 def kafka_sink(df, freq):
     return df.selectExpr("CAST(null AS STRING) as key", "to_json(struct(*)) AS value") \
         .writeStream \
@@ -253,14 +253,14 @@ def kafka_sink(df, freq):
 
 stream = kafka_sink(raw_files, 30)
 
-# На этом этапе нужно посмотреть в соседней консоли как пишется стрим.
+\# На этом этапе нужно посмотреть в соседней консоли как пишется стрим.
 
-# По завершении останавливаю стрим.
+\# По завершении останавливаю стрим.
 stream.stop()
 
-######################################################################
-# Проверяем, что записалось в топик
-######################################################################
+\######################################################################
+\# Проверяем, что записалось в топик
+\######################################################################
 raw_purchases = spark.readStream. \
     format("kafka"). \
     option("kafka.bootstrap.servers", kafka_brokers). \
