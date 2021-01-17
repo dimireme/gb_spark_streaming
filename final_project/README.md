@@ -338,6 +338,111 @@ stream.stop()
 
 ### Создание коллаборативной модели рекомендаций. ALS.
 
+На данном этапе данные для обучения модели находятся в папке `historical_purchases` на HDFS, в фармате parquet. Эти данные мы делим на тренировочные и валидационные. На валидационных данных будем контролировать переобучение модели. 
+
+В качестве ML-метрики выбрал precision@k - доля рекомендованных товаров среди фактически купленных. 
+
+В ячейках user-item матрицы стоит количество покупок товара пользователем `quantity`, а не стоимость покупки `sales_value`. Предполагается что бизнесовая задача состоит в том чтобы пользователь чаще покупал товары, которые мы рекомендуем. Так можно докрутить модель и рекомендовать товары собственной торговой марки (СТМ), маржинальность которых гораздо выше чем у обычных товаров. То есть стоимость покупки не то же самое что выручка магазина с покупки.
+ 
+Код для обучения модели ALS находится в файле `train_model.py`. 
+
+
+<details>
+<summary>Содержимое файла train_model.py.</summary>
+<pre>
+<code>
+
+\# coding=utf-8
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, IntegerType, FloatType
+from pyspark.ml.recommendation import ALS
+from pyspark.sql import functions as F
+
+spark = SparkSession.builder.appName("shadrin_final_model_spark").getOrCreate()
+
+\######################################################################
+\# Разбиваем датафрейм на тренировочный и валидационный 80/20
+\######################################################################
+schema_purchases = StructType() \
+    .add("user_id", IntegerType()) \
+    .add("item_id", IntegerType()) \
+    .add("quantity", IntegerType()) \
+    .add("sales_value", FloatType())
+
+data = spark \
+    .read \
+    .format("parquet") \
+    .schema(schema_purchases) \
+    .load('historical_purchases')
+
+train, valid = data.randomSplit([0.8, 0.2])
+
+\# Собственные покупки пользователя
+own_purchases = data \
+    .groupBy(F.col("user_id")) \
+    .agg(F.array_distinct(F.collect_list("item_id")).alias("own"))
+
+
+\# Метрика precision@k показывает какую долю рекомендованных товаров покупал пользователь.
+def precision_at_k (recs, own):
+    flags = [1 if i in own else 0 for i in recs]
+    return sum(flags) / float(len(recs))
+
+
+precision_at_k_udf = F.udf(precision_at_k)
+
+\######################################################################
+\# Обучаем модель
+\######################################################################
+als = ALS(maxIter=10,
+          regParam=0.1,
+          userCol="user_id",
+          itemCol="item_id",
+          ratingCol="quantity",
+          coldStartStrategy="drop")
+
+model = als.fit(train)
+
+k = 5
+
+users_train = train.select(als.getUserCol()).distinct()
+users_valid = valid.select(als.getUserCol()).distinct()
+
+train_result = model.recommendForUserSubset(users_train, k) \
+    .selectExpr("user_id", "recommendations.item_id as recs") \
+    .join(own_purchases, on=['user_id'], how="left") \
+    .withColumn("precision_at_k", precision_at_k_udf(F.col("recs"), F.col("own")))  \
+    .agg({"precision_at_k": "avg"})
+train_result.show()
+
+valid_result = model.recommendForUserSubset(users_valid, k) \
+    .selectExpr("user_id", "recommendations.item_id as recs") \
+    .join(own_purchases, on=['user_id'], how="left") \
+    .withColumn("precision_at_k", precision_at_k_udf(F.col("recs"), F.col("own")))  \
+    .agg({"precision_at_k": "avg"})
+valid_result.show()
+
+\# Сохраняем модель
+model.save("als_trained")
+
+</code>
+</pre>
+</details>
+
+
+По результатам обучения получили точность `precision@k` на тренировочной выборке `0.0830`, на валидационной выборке `0.0832`. Модель не переобучилась и точность около 8%. Считаю что это удовлетворительный результат. Модель была сохранена в папку `als_trained`.
+
+```bash
+[BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ hdfs dfs -ls als_trained
+
+    Found 3 items
+    drwxr-xr-x   - BD_274_ashadrin BD_274_ashadrin          0 2021-01-17 23:01 als_trained/itemFactors
+    drwxr-xr-x   - BD_274_ashadrin BD_274_ashadrin          0 2021-01-17 23:01 als_trained/metadata
+    drwxr-xr-x   - BD_274_ashadrin BD_274_ashadrin          0 2021-01-17 23:01 als_trained/userFactors
+```
+
+
+
 ### Применение модели в стриминге.
 
 ### Создание медленного пайплайна для актуализации бейзлайнов и модели.
