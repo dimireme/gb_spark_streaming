@@ -171,7 +171,7 @@ select * from shadrin_final.baseline;
      Created topic "shadrin_purchases".
 ```
 
-Запускаем pyspark и последовательно выполняем кооманды из файла `split_data.py`. 
+Запускаем pyspark и последовательно выполняем команды из файла `split_data.py`. 
 
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /spark2.4/bin/pyspark --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5,com.datastax.spark:spark-cassandra-connector_2.11:2.4.2 --driver-memory 512m --driver-cores 1 --master local[1]
