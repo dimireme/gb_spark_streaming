@@ -170,8 +170,173 @@ select * from shadrin_final.baseline;
         top_5 |   [995242, 1082185, 1127831, 5569230, 951590]
 
 
-В итоге получим заполненные таблички в Кассандре. 
+В итоге получили заполненные таблички. Выходим из терминала Кассандры командой `exit;`. 
+
+###### Разбиение датафрейма и создание топика тестовых данных
+
+Создадим топик `shadrin_purchases` с одной партицией и фактором репликации 2. Время жизни топика не ограничено.
+```bash
+[BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --create --topic shadrin_purchases --zookeeper bigdataanalytics-worker-0.novalocal:2181 --partitions 1 --replication-factor 2 --config retention.ms=-1
+```
+
+    Created topic "shadrin_purchases".
+
+Запускаем pyspark и последовательно выполняем кооманды из файла `split_data.py`. 
 
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /spark2.4/bin/pyspark --packages org.apache.spark:spark-sql-kafka-0-10_2.11:2.4.5,com.datastax.spark:spark-cassandra-connector_2.11:2.4.2 --driver-memory 512m --driver-cores 1 --master local[1]
 ```
+
+<details>
+<summary>Содержимое файла split_data.py.</summary>
+
+# coding=utf-8
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, IntegerType, FloatType
+from pyspark.sql import functions as F
+import subprocess
+
+spark = SparkSession.builder.appName("shadrin_final_topic_spark").getOrCreate()
+
+######################################################################
+# Разбиваем датафрейм на тренировочный и тестовый 50/50
+######################################################################
+schema_purchases = StructType() \
+    .add("user_id", IntegerType()) \
+    .add("item_id", IntegerType()) \
+    .add("quantity", IntegerType()) \
+    .add("sales_value", FloatType())
+
+purchases = spark \
+    .read \
+    .format("csv") \
+    .schema(schema_purchases) \
+    .options(header=True) \
+    .load('data/purchases.csv')
+
+shuffled = purchases.orderBy(F.rand())
+train, test = shuffled.randomSplit([0.5, 0.5])
+train = train.orderBy(F.rand())
+test = test.orderBy(F.rand())
+
+
+######################################################################
+# Сохраняем train и test на HDFS в разные папки
+######################################################################
+
+# на всякий случай
+subprocess.call(["hdfs", "dfs", "-rm", "-r", "for_topic"])
+subprocess.call(["hdfs", "dfs", "-rm", "-r", "for_train"])
+
+test.repartition(1).write.csv("for_topic")
+train.repartition(1).write.csv("for_train")
+
+train.count()
+# 1188916
+
+test.count()
+# 1190432
+
+######################################################################
+# Записываем тестовые данные в топик shadrin_purchases
+######################################################################
+
+# читаем файлы в стриме
+raw_files = spark \
+    .readStream \
+    .format("csv") \
+    .schema(schema_purchases) \
+    .options(path="for_topic", header=False) \
+    .load()
+
+# указываем одну из нод с кафкой
+kafka_brokers = "bigdataanalytics-worker-0.novalocal:6667"
+
+# пишем стрим в Кафку
+def kafka_sink(df, freq):
+    return df.selectExpr("CAST(null AS STRING) as key", "to_json(struct(*)) AS value") \
+        .writeStream \
+        .format("kafka") \
+        .trigger(processingTime='%s seconds' % freq ) \
+        .option("topic", "shadrin_purchases") \
+        .option("kafka.bootstrap.servers", kafka_brokers) \
+        .option("checkpointLocation", "shadrin_purchases_kafka_checkpoint") \
+        .start()
+
+
+stream = kafka_sink(raw_files, 30)
+
+# На этом этапе нужно посмотреть в соседней консоли как пишется стрим.
+
+# По завершении останавливаю стрим.
+stream.stop()
+
+######################################################################
+# Проверяем, что записалось в топик
+######################################################################
+raw_purchases = spark.readStream. \
+    format("kafka"). \
+    option("kafka.bootstrap.servers", kafka_brokers). \
+    option("subscribe", "shadrin_purchases"). \
+    option("startingOffsets", "earliest"). \
+    option("maxOffsetsPerTrigger", "10"). \
+    load()
+
+parsed_purchase = raw_purchases \
+    .select(F.from_json(F.col("value").cast("String"), schema_purchases).alias("value"), "offset") \
+    .select("value.*", "offset")
+
+
+def console_output(df, freq):
+    return df.writeStream \
+        .format("console") \
+        .trigger(processingTime='%s seconds' % freq) \
+        .options(truncate=False) \
+        .start()
+
+
+stream = console_output(parsed_purchase, 5)
+stream.stop()
+
+</details>
+
+Здесь происходит запись стрима в куфку, поэтому контролируем в соседней кнсоли сколько данных записалось. В топик `shadrin_purchases` пишется только половина исходного датафрейма, это примерно 1189674 записи.
+ 
+```bash
+/usr/hdp/3.1.4.0-315/kafka/bin/kafka-console-consumer.sh --topic shadrin_purchases --from-beginning --bootstrap-server bigdataanalytics-worker-0.novalocal:6667
+```
+
+Конец вывода:
+
+    {"user_id":1645,"item_id":9416653,"quantity":1,"sales_value":4.99}
+    {"user_id":1114,"item_id":1067494,"quantity":1,"sales_value":4.59}
+    {"user_id":20,"item_id":984669,"quantity":1,"sales_value":2.29}
+    {"user_id":1798,"item_id":8019562,"quantity":1,"sales_value":2.99}
+    {"user_id":591,"item_id":945779,"quantity":3,"sales_value":3.0}
+    Processed a total of 1190432 messages
+
+Проверил, именно столько записей и было в датафрейме `test`. В датафрейме `train` 1188916 записи.
+
+После чтения топика в консоль в спарке наблюдаю микробатчи:
+
+    -------------------------------------------
+    Batch: 10
+    -------------------------------------------
+    +-------+-------+--------+-----------+------+
+    |user_id|item_id|quantity|sales_value|offset|
+    +-------+-------+--------+-----------+------+
+    |2186   |1124971|1       |3.11       |100   |
+    |265    |835098 |1       |3.14       |101   |
+    |937    |943737 |1       |3.33       |102   |
+    |232    |1002558|1       |1.79       |103   |
+    |2411   |1011926|1       |2.5        |104   |
+    |2139   |5565664|1       |2.0        |105   |
+    |2395   |8090440|1       |6.99       |106   |
+    |1868   |854042 |1       |1.0        |107   |
+    |2124   |1082185|1       |0.71       |108   |
+    |1366   |879152 |1       |1.0        |109   |
+    +-------+-------+--------+-----------+------+
+
+
+
+
