@@ -217,10 +217,10 @@ test = test.orderBy(F.rand())
 
 \# на всякий случай
 subprocess.call(["hdfs", "dfs", "-rm", "-r", "for_topic"])
-subprocess.call(["hdfs", "dfs", "-rm", "-r", "for_train"])
+subprocess.call(["hdfs", "dfs", "-rm", "-r", "historical_purchases"])
 
 test.repartition(1).write.csv("for_topic")
-train.repartition(1).write.csv("for_train")
+train.repartition(1).write.csv("historical_purchases")
 
 train.count()
 \# 1188916
@@ -308,7 +308,7 @@ stream.stop()
     {"user_id":591,"item_id":945779,"quantity":3,"sales_value":3.0}
     Processed a total of 1190432 messages
 
-Проверил, именно столько записей и было в датафрейме `test`. В датафрейме `train` 1188916 записи.
+В датафрейме `test` было 1190432 записи. Именно столько и записалось в топик. В датафрейме `train` было 1188916 записи.
 
 После чтения топика в консоль, в спарке наблюдаю микробатчи:
 

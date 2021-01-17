@@ -34,10 +34,10 @@ test = test.orderBy(F.rand())
 
 # на всякий случай
 subprocess.call(["hdfs", "dfs", "-rm", "-r", "for_topic"])
-subprocess.call(["hdfs", "dfs", "-rm", "-r", "for_train"])
+subprocess.call(["hdfs", "dfs", "-rm", "-r", "historical_purchases"])
 
 test.repartition(1).write.csv("for_topic")
-train.repartition(1).write.csv("for_train")
+train.repartition(1).write.csv("historical_purchases")
 
 train.count()
 # 1188916
@@ -75,7 +75,6 @@ def kafka_sink(df, freq):
 stream = kafka_sink(raw_files, 30)
 
 # На этом этапе нужно посмотреть в соседней консоли как пишется стрим.
-
 # По завершении останавливаю стрим.
 stream.stop()
 
