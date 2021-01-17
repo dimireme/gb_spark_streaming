@@ -177,7 +177,7 @@ select * from shadrin_final.baseline;
 <summary>Содержимое файла split_data.py.</summary>
 <pre>
 <code>
-# coding=utf-8
+\# coding=utf-8
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, IntegerType, FloatType
 from pyspark.sql import functions as F
@@ -185,9 +185,9 @@ import subprocess
 
 spark = SparkSession.builder.appName("shadrin_final_topic_spark").getOrCreate()
 
-######################################################################
-# Разбиваем датафрейм на тренировочный и тестовый 50/50
-######################################################################
+\######################################################################
+\# Разбиваем датафрейм на тренировочный и тестовый 50/50
+\######################################################################
 schema_purchases = StructType() \
     .add("user_id", IntegerType()) \
     .add("item_id", IntegerType()) \
