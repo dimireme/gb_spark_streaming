@@ -58,12 +58,13 @@ ssh BD_274_ashadrin@89.208.223.141 -i ~/.ssh/id_rsa_gb_spark
 Проверяем что файлы загрузились.
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ ls -lah  data/
-total 44M
-drwxrwxr-x 2 BD_274_ashadrin BD_274_ashadrin 4,0K янв 16 17:50 .
-drwx------ 7 BD_274_ashadrin BD_274_ashadrin 4,0K янв 16 17:50 ..
--rw-r--r-- 1 BD_274_ashadrin BD_274_ashadrin 153K янв 16 17:50 item_features.csv
--rw-r--r-- 1 BD_274_ashadrin BD_274_ashadrin  44M янв 16 17:51 purchases.csv
--rw-r--r-- 1 BD_274_ashadrin BD_274_ashadrin   49 янв 16 17:50 top_5_by_category.csv
+    
+    total 44M
+    drwxrwxr-x 2 BD_274_ashadrin BD_274_ashadrin 4,0K янв 16 17:50 .
+    drwx------ 7 BD_274_ashadrin BD_274_ashadrin 4,0K янв 16 17:50 ..
+    -rw-r--r-- 1 BD_274_ashadrin BD_274_ashadrin 153K янв 16 17:50 item_features.csv
+    -rw-r--r-- 1 BD_274_ashadrin BD_274_ashadrin  44M янв 16 17:51 purchases.csv
+    -rw-r--r-- 1 BD_274_ashadrin BD_274_ashadrin   49 янв 16 17:50 top_5_by_category.csv
 ```
 
 Копируем файлы на HDFS.
@@ -74,11 +75,11 @@ drwx------ 7 BD_274_ashadrin BD_274_ashadrin 4,0K янв 16 17:50 ..
 Проверим что все файлы попали на HDFS.
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ hdfs dfs -du -h data
-```
 
     152.6 K  457.7 K  data/item_features.csv
     43.0 M   129.1 M  data/purchases.csv
     49       147      data/top_5_by_category.csv
+```
 
 #### Создание таблиц в Кассандре
 
@@ -131,30 +132,29 @@ TODO: добавить команды, которые копируют файл 
 Проверяем как записались данные в Кассандру.
 ```bash
 select * from shadrin_final.item_features where product_id = 818981;
-```
 
      product_id | category    | department
     ------------+-------------+------------
          818981 | COLD CEREAL |    GROCERY
+```
 
 ```bash
 select * from shadrin_final.own_purchases where user_id = 2375;
-```
-Тут я обрезал вывод. Собственных покупок пользователей очень много.
 
      user_id | item_id_list
     ---------+--------------------------------
         2375 | [828370, 827919, 997200, ... ]
+```
+Тут я обрезал вывод. Собственных покупок пользователей очень много.
 
 ```bash
 select * from shadrin_final.baseline;
-```
 
      name     | list
     ----------+-----------------------------------------------
      random_5 | [1185870, 1492723, 8019418, 894845, 12814320]
         top_5 |   [995242, 1082185, 1127831, 5569230, 951590]
-
+```
 
 В итоге получили заполненные таблички. Выходим из терминала Кассандры командой `exit;`. 
 
@@ -163,9 +163,9 @@ select * from shadrin_final.baseline;
 Создадим топик `shadrin_purchases` с одной партицией и фактором репликации 2. Время жизни топика не ограничено.
 ```bash
 [BD_274_ashadrin@bigdataanalytics-worker-0 ~]$ /usr/hdp/3.1.4.0-315/kafka/bin/kafka-topics.sh --create --topic shadrin_purchases --zookeeper bigdataanalytics-worker-0.novalocal:2181 --partitions 1 --replication-factor 2 --config retention.ms=-1
-```
 
-    Created topic "shadrin_purchases".
+     Created topic "shadrin_purchases".
+```
 
 Запускаем pyspark и последовательно выполняем кооманды из файла `split_data.py`. 
 
@@ -306,7 +306,7 @@ stream.stop()
 
 Проверил, именно столько записей и было в датафрейме `test`. В датафрейме `train` 1188916 записи.
 
-После чтения топика в консоль в спарке наблюдаю микробатчи:
+После чтения топика в консоль, в спарке наблюдаю микробатчи:
 
     -------------------------------------------
     Batch: 10
