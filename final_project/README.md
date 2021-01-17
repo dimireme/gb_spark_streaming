@@ -89,8 +89,9 @@ ssh BD_274_ashadrin@89.208.223.141 -i ~/.ssh/id_rsa_gb_spark
 ```
 
 Создаём новое пространство таблиц `shadrin_final`.
+
 ```sql
-CREATE  KEYSPACE IF NOT EXISTS shadrin_final 
+CREATE KEYSPACE IF NOT EXISTS shadrin_final 
 WITH REPLICATION = { 
    'class' : 'SimpleStrategy', 
    'replication_factor' : 1 
@@ -98,6 +99,7 @@ WITH REPLICATION = {
 ```
 
 Создаём таблицу фичей товаров.
+
 ```sql
 CREATE TABLE IF NOT EXISTS shadrin_final.item_features (
     product_id int,
@@ -108,6 +110,7 @@ CREATE TABLE IF NOT EXISTS shadrin_final.item_features (
 ```
 
 Создаём таблицу собственных покупок пользователя. Эта таблица поможет посчитать точность рекомендаций `precision@5` в микробатче сразу с рассчётом рекомендаций. Сюда попадут все данные о покупках из датасета `purchases.csv`. 
+
 ```sql
 CREATE TABLE IF NOT EXISTS shadrin_final.own_purchases (
     user_id int,
@@ -117,6 +120,7 @@ CREATE TABLE IF NOT EXISTS shadrin_final.own_purchases (
 ```
 
 Создаём таблицу с бэйзлайнами. Тут будет две записи: топ 5 популярных покупок и 5 случайных товаров.
+
 ```sql
 CREATE TABLE IF NOT EXISTS shadrin_final.baseline (
     name text,
