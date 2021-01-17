@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS shadrin_final.item_features (
 );
 ```
 
-Создаём таблицу собственных покупок пользователя. Эта таблица поможет посчитать точность рекомендаций `precision@5` в микробатче. 
+Создаём таблицу собственных покупок пользователя. Эта таблица поможет посчитать точность рекомендаций `precision@5` в микробатче сразу с рассчётом рекомендаций. Сюда попадут все данные о покупках из датасета `purchases.csv`. 
 ```
 CREATE TABLE IF NOT EXISTS shadrin_final.own_purchases (
     user_id int,
@@ -122,20 +122,6 @@ CREATE TABLE IF NOT EXISTS shadrin_final.baseline (
     list list<int>,
     primary key (name)
 );
-```
-
-ПРОСТО ПОЛЕЗНЫЕ КОМАНДЫ. TODO: удалить
-```
-SELECT table_name FROM system_schema.tables WHERE keyspace_name = 'shadrin_final';
-
-SELECT * from shadrin_final.item_features;
-drop table shadrin_final.item_features;
-
-SELECT * from shadrin_final.baseline;
-drop table shadrin_final.baseline;
-
-SELECT * from shadrin_final.own_purchases;
-drop table shadrin_final.own_purchases;
 ```
 
 Далее выполним код из файла `init_cassandra_tables.py`. Воспользуемся для этого новым терминалом. 
@@ -190,6 +176,8 @@ select * from shadrin_final.baseline;
 <details>
 <summary>Содержимое файла split_data.py.</summary>
 
+<pre>
+<code>
 # coding=utf-8
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, IntegerType, FloatType
@@ -298,6 +286,9 @@ def console_output(df, freq):
 stream = console_output(parsed_purchase, 5)
 stream.stop()
 
+</code>
+</pre>
+
 </details>
 
 Здесь происходит запись стрима в куфку, поэтому контролируем в соседней кнсоли сколько данных записалось. В топик `shadrin_purchases` пишется только половина исходного датафрейма, это примерно 1189674 записи.
@@ -348,3 +339,16 @@ stream.stop()
 
 Эту часть не выполнял, сделаю после проверки.   
 
+ПРОСТО ПОЛЕЗНЫЕ КОМАНДЫ. TODO: удалить
+```
+SELECT table_name FROM system_schema.tables WHERE keyspace_name = 'shadrin_final';
+
+SELECT * from shadrin_final.item_features;
+drop table shadrin_final.item_features;
+
+SELECT * from shadrin_final.baseline;
+drop table shadrin_final.baseline;
+
+SELECT * from shadrin_final.own_purchases;
+drop table shadrin_final.own_purchases;
+```
