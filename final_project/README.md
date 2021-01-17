@@ -441,8 +441,6 @@ model.save("als_trained")
     drwxr-xr-x   - BD_274_ashadrin BD_274_ashadrin          0 2021-01-17 23:01 als_trained/userFactors
 ```
 
-
-
 ### Применение модели в стриминге.
 
 ### Создание медленного пайплайна для актуализации бейзлайнов и модели.

@@ -6,6 +6,8 @@ from pyspark.sql import functions as F
 
 spark = SparkSession.builder.appName("shadrin_final_model_spark").getOrCreate()
 
+model_path = "als_trained"
+
 ######################################################################
 # Разбиваем датафрейм на тренировочный и валидационный 80/20
 ######################################################################
@@ -69,4 +71,4 @@ valid_result = model.recommendForUserSubset(users_valid, k) \
 valid_result.show()
 
 # Сохраняем модель
-model.save("als_trained")
+model.save(model_path)
