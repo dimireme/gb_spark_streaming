@@ -175,7 +175,6 @@ select * from shadrin_final.baseline;
 
 <details>
 <summary>Содержимое файла split_data.py.</summary>
-
 <pre>
 <code>
 # coding=utf-8
@@ -285,7 +284,6 @@ def console_output(df, freq):
 
 stream = console_output(parsed_purchase, 5)
 stream.stop()
-
 </code>
 </pre>
 
