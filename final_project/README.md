@@ -100,7 +100,7 @@ WITH REPLICATION = {
 
 Создаём таблицу фичей товаров.
 
-```cassandra
+```sql
 CREATE TABLE IF NOT EXISTS shadrin_final.item_features (
     product_id int,
     department text,
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS shadrin_final.baseline (
 TODO: добавить команды, которые копируют файл с кодом на кластер и запуск этого файла через spark-submit.
 
 Проверяем как записались данные в Кассандру.
-```cassandra
+```sql
 select * from shadrin_final.item_features where product_id = 818981;
 
      product_id | category    | department
@@ -142,7 +142,7 @@ select * from shadrin_final.item_features where product_id = 818981;
          818981 | COLD CEREAL |    GROCERY
 ```
 
-```cassandra
+```sql
 select * from shadrin_final.own_purchases where user_id = 2375;
 
      user_id | item_id_list
@@ -151,7 +151,7 @@ select * from shadrin_final.own_purchases where user_id = 2375;
 ```
 Тут я обрезал вывод. Собственных покупок пользователей очень много.
 
-```cassandra
+```sql
 select * from shadrin_final.baseline;
 
      name     | list
