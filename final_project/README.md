@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS shadrin_final.item_features (
 ```
 
 Создаём таблицу собственных покупок пользователя. Эта таблица поможет посчитать точность рекомендаций `precision@5` в микробатче сразу с рассчётом рекомендаций. Сюда попадут все данные о покупках из датасета `purchases.csv`. 
-```
+```sql
 CREATE TABLE IF NOT EXISTS shadrin_final.own_purchases (
     user_id int,
     item_id_list list<int>,
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS shadrin_final.own_purchases (
 ```
 
 Создаём таблицу с бэйзлайнами. Тут будет две записи: топ 5 популярных покупок и 5 случайных товаров.
-```
+```sql
 CREATE TABLE IF NOT EXISTS shadrin_final.baseline (
     name text,
     list list<int>,
