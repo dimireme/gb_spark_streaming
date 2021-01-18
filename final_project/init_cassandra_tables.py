@@ -55,8 +55,6 @@ own_purchases.write \
 ######################################################################
 # записываем файл топ 5 товаров из top_5_by_category.csv в Кассандру
 ######################################################################
-# TODO: move it to model re-fit batch
-
 schema_top_5 = StructType() \
     .add("product_id", IntegerType())
 
