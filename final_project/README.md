@@ -450,17 +450,31 @@ model.save("als_trained")
     +-------+-------+--------+-----------+------+--------------------+--------------+--------------------+----------+
     |item_id|user_id|quantity|sales_value|offset|                recs|precision_at_k|            category|department|
     +-------+-------+--------+-----------+------+--------------------+--------------+--------------------+----------+
+    |5563693|   1507|       1|       3.99|    95|[6544236, 731106,...|           0.0|            TOMATOES|   PRODUCE|
     | 822786|   1975|       2|      31.98|    19|[6544236, 5845857...|           0.2|                null|      null|
-    | 907418|    447|       1|       2.59|    16|[6544236, 5668996...|           0.0|ICE CREAM/MILK/SH...|   GROCERY|
-    |1078652|   2468|       1|       2.99|    17|[6544236, 5668996...|           0.0|         COLD CEREAL|   GROCERY|
-    |1137775|   1229|       1|       2.85|    18|[6544236, 5845857...|           0.2|             CHEESES|      DELI|
-    | 982493|   1239|       1|       1.02|    15|[6544236, 5668996...|           0.0|   BAKED SWEET GOODS|   GROCERY|
+    | 953476|   2479|       1|       0.44|    34|[6544236, 5845857...|           0.2|                null|      null|
+    | 862799|   1653|       1|       6.49|    44|[6544236, 5845857...|           0.0|              COFFEE|   GROCERY|
+    | 847982|   1823|       1|       1.99|    30|[6544236, 5845857...|           0.2|           SALAD MIX|   PRODUCE|
+    | 892004|   2484|       2|        1.5|    24|[6544236, 5845857...|           0.2|                null|      null|
+    | 833025|   1621|       1|       1.16|    59|[6544236, 5668996...|           0.0|    MILK BY-PRODUCTS|   GROCERY|
+    |1082185|    332|       1|       1.11|    93|[6544236, 731106,...|           0.0|      TROPICAL FRUIT|   PRODUCE|
+    | 868206|    831|       1|      11.89|     6|[731106, 6544236,...|           0.0|                null|      null|
+    | 916122|   2322|       1|       6.31|    38|[6544236, 731106,...|           0.4|             CHICKEN|      MEAT|
+    |1052912|   2168|       1|        1.0|    71|[6544236, 420647,...|           0.0|           SALAD MIX|   PRODUCE|
+    | 991932|    409|       1|        2.5|    64|[6544236, 5845857...|           0.2|                null|      null|
+    |1081111|    604|       1|        1.0|    79|[6544236, 5668996...|           0.0|                null|      null|
+    | 888532|     93|       1|       1.79|    33|[6544236, 5845857...|           0.2|                SOUP|   GROCERY|
+    |1126899|    539|       1|       1.99|    35|[6544236, 5845857...|           0.0| FLUID MILK PRODUCTS|   GROCERY|
+    |1053763|    725|       1|        0.2|    51|[6544236, 731106,...|           0.0|                null|      null|
+    | 921744|    654|       1|        2.0|    37|[6544236, 731106,...|           0.0|          BAG SNACKS|   GROCERY|
+    |1079941|   1944|       1|       2.99|    26|[6544236, 5845857...|           0.2|                null|      null|
+    |1103741|   2284|       1|       1.59|    29|[6544236, 6533889...|           0.2|FRUIT - SHELF STABLE|   GROCERY|
+    | 950988|    132|       1|       1.29|    12|[6544236, 5845857...|           0.2|                null|      null|
     +-------+-------+--------+-----------+------+--------------------+--------------+--------------------+----------+
+    only showing top 20 rows
     
-    avg_precision_at_k:  0.08                                                       
-    duration:  37.7740559578
-
-Время выполнение микробатча при пачке в 5 записей составило 37 секунд. Во время отладки проверял без подключения датафрейма фичей товаров, время выполнения было примерно 18 секунд, когда на вход поступало 5 записей и 100 записей. Есть подозрение что время выполнения микробатча слабо завиит от объёма входных данных.
+    avg_precision_at_k:  0.117525773196                                             
+    duration:  42.9748260975  
 
 <details>
 <summary>Содержимое файла apply_model.py.</summary>
@@ -523,40 +537,8 @@ def foreach_batch_sink(df, freq):
 def foreach_batch_function(df, epoch_id):
     start_time = time.time()
     # df
-    user_ids = df.select("user_id")
-    # pyton list
-    user_ids_list = user_ids.select('user_id') \
-        .rdd.flatMap(lambda x: x) \
-        .collect()
-    #
-    own_purchases = cass_own_purchases \
-        .filter(F.col("user_id").isin(user_ids_list)) \
-        .withColumnRenamed("item_id_list", "own")
-    train_result = model.recommendForUserSubset(user_ids, k) \
-        .selectExpr("user_id", "recommendations.item_id as recs") \
-        .join(own_purchases, on=['user_id'], how="left") \
-        .withColumn("precision_at_k", precision_at_k_udf(F.col("recs"), F.col("own"))) \
-    #
-    train_result.persist()
-    #
-    train_result.show()
-    #
-    avg_precision_at_k = train_result \
-        .agg({"precision_at_k": "avg"}) \
-        .rdd.flatMap(lambda x: x) \
-        .collect()[0]
-    #
-    duration = time.time() - start_time
-    print "avg_precision_at_k: ", avg_precision_at_k
-    print "duration: ", duration
-    train_result.unpersist()
-
-
-def foreach_batch_function(df, epoch_id):
-    start_time = time.time()
-    # df
     user_ids = df.select("user_id").distinct()
-    # pyton list
+    # python list
     user_ids_list = user_ids.select('user_id') \
         .rdd.flatMap(lambda x: x) \
         .collect()
@@ -590,9 +572,11 @@ def foreach_batch_function(df, epoch_id):
         .agg({"precision_at_k": "avg"}) \
         .rdd.flatMap(lambda x: x) \
         .collect()[0]
-    #
-    duration = time.time() - start_time
     print "avg_precision_at_k: ", avg_precision_at_k
+    # сохраним батч на HDFS
+    extended_df.write.mode("append").parquet("new_purchases")
+    # выведем время выполнения батча
+    duration = time.time() - start_time
     print "duration: ", duration
     train_result.unpersist()
 
@@ -608,7 +592,7 @@ raw_data = spark.readStream. \
     option("kafka.bootstrap.servers", kafka_brokers). \
     option("subscribe", "shadrin_purchases"). \
     option("startingOffsets", "earliest"). \
-    option("maxOffsetsPerTrigger", "5"). \
+    option("maxOffsetsPerTrigger", "100"). \
     load()
 
 parsed_data = raw_data \
@@ -616,9 +600,32 @@ parsed_data = raw_data \
     .select("value.*", "offset")
 
 
-s = foreach_batch_sink(parsed_data, 30)
+s = foreach_batch_sink(parsed_data, 60)
 s.stop()
 
 </code>
 </pre>
 </details>
+
+Время выполнение микробатча при пачке в 5 записей и 100 записей было примерно одинаковым, 50 секунд. На HDFS появилась папка `new_purchases` с новыми данными. Их можно использовать для повторного обучения модели.
+
+```bash
+hdfs dfs -ls new_purchases
+    
+    Found 3 items
+    -rw-r--r--   3 BD_274_ashadrin BD_274_ashadrin          0 2021-01-18 14:41 new_purchases/_SUCCESS
+    -rw-r--r--   3 BD_274_ashadrin BD_274_ashadrin       5314 2021-01-18 14:40 new_purchases/part-00000-5ecf093b-25e0-4956-9d18-87f7be02edc1-c000.snappy.parquet
+    -rw-r--r--   3 BD_274_ashadrin BD_274_ashadrin       5223 2021-01-18 14:41 new_purchases/part-00000-f941a02d-4239-46e8-8a87-f3a56c0bca51-c000.snappy.parquet
+```
+
+Данные в директории можно прогнать через метод `compact_directory`, чтобы они занимали меньше места.
+
+```python
+def compact_directory(path):
+    df_to_compact = spark.read.parquet(path + "/*.parquet")
+    tmp_path = path + "_tmp"
+    df_to_compact.write.mode("overwrite").parquet(tmp_path)
+    df_to_compact = spark.read.parquet(tmp_path + "/*.parquet")
+    df_to_compact.write.mode("overwrite").parquet(path)
+    subprocess.call(["hdfs", "dfs", "-rm", "-r", tmp_path])
+```

@@ -54,40 +54,8 @@ def foreach_batch_sink(df, freq):
 def foreach_batch_function(df, epoch_id):
     start_time = time.time()
     # df
-    user_ids = df.select("user_id")
-    # pyton list
-    user_ids_list = user_ids.select('user_id') \
-        .rdd.flatMap(lambda x: x) \
-        .collect()
-    #
-    own_purchases = cass_own_purchases \
-        .filter(F.col("user_id").isin(user_ids_list)) \
-        .withColumnRenamed("item_id_list", "own")
-    train_result = model.recommendForUserSubset(user_ids, k) \
-        .selectExpr("user_id", "recommendations.item_id as recs") \
-        .join(own_purchases, on=['user_id'], how="left") \
-        .withColumn("precision_at_k", precision_at_k_udf(F.col("recs"), F.col("own"))) \
-    #
-    train_result.persist()
-    #
-    train_result.show()
-    #
-    avg_precision_at_k = train_result \
-        .agg({"precision_at_k": "avg"}) \
-        .rdd.flatMap(lambda x: x) \
-        .collect()[0]
-    #
-    duration = time.time() - start_time
-    print "avg_precision_at_k: ", avg_precision_at_k
-    print "duration: ", duration
-    train_result.unpersist()
-
-
-def foreach_batch_function(df, epoch_id):
-    start_time = time.time()
-    # df
     user_ids = df.select("user_id").distinct()
-    # pyton list
+    # python list
     user_ids_list = user_ids.select('user_id') \
         .rdd.flatMap(lambda x: x) \
         .collect()
@@ -121,9 +89,11 @@ def foreach_batch_function(df, epoch_id):
         .agg({"precision_at_k": "avg"}) \
         .rdd.flatMap(lambda x: x) \
         .collect()[0]
-    #
-    duration = time.time() - start_time
     print "avg_precision_at_k: ", avg_precision_at_k
+    # сохраним батч на HDFS
+    extended_df.write.mode("append").parquet("new_purchases")
+    # выведем время выполнения батча
+    duration = time.time() - start_time
     print "duration: ", duration
     train_result.unpersist()
 
@@ -139,7 +109,7 @@ raw_data = spark.readStream. \
     option("kafka.bootstrap.servers", kafka_brokers). \
     option("subscribe", "shadrin_purchases"). \
     option("startingOffsets", "earliest"). \
-    option("maxOffsetsPerTrigger", "5"). \
+    option("maxOffsetsPerTrigger", "100"). \
     load()
 
 parsed_data = raw_data \
@@ -147,7 +117,7 @@ parsed_data = raw_data \
     .select("value.*", "offset")
 
 
-s = foreach_batch_sink(parsed_data, 30)
+s = foreach_batch_sink(parsed_data, 60)
 s.stop()
 
 
