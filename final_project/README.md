@@ -443,22 +443,182 @@ model.save("als_trained")
 
 ### Применение модели в стриминге.
 
-### Создание медленного пайплайна для актуализации бейзлайнов и модели.
+Далее создаем стрим чтения данных из топика `shadrin_purchases`, подтягиваем датафрейм фичей товаров `item_features` и датафрейм собственных покупок пользователя `own_purchases` из Кассандры. Датафрейм собственных покупок нужен для того, чтобы посчитать метрику `average_precision@k`. 
 
-### Удаление данных из кластера.
+В методе `foreach_batch_function` мёржим два датафрейма, считаем метрику и выводим на консоль результат. Пример вывода: 
 
-Эту часть не выполнял, сделаю после проверки.   
+    +-------+-------+--------+-----------+------+--------------------+--------------+--------------------+----------+
+    |item_id|user_id|quantity|sales_value|offset|                recs|precision_at_k|            category|department|
+    +-------+-------+--------+-----------+------+--------------------+--------------+--------------------+----------+
+    | 822786|   1975|       2|      31.98|    19|[6544236, 5845857...|           0.2|                null|      null|
+    | 907418|    447|       1|       2.59|    16|[6544236, 5668996...|           0.0|ICE CREAM/MILK/SH...|   GROCERY|
+    |1078652|   2468|       1|       2.99|    17|[6544236, 5668996...|           0.0|         COLD CEREAL|   GROCERY|
+    |1137775|   1229|       1|       2.85|    18|[6544236, 5845857...|           0.2|             CHEESES|      DELI|
+    | 982493|   1239|       1|       1.02|    15|[6544236, 5668996...|           0.0|   BAKED SWEET GOODS|   GROCERY|
+    +-------+-------+--------+-----------+------+--------------------+--------------+--------------------+----------+
+    
+    avg_precision_at_k:  0.08                                                       
+    duration:  37.7740559578
 
-ПРОСТО ПОЛЕЗНЫЕ КОМАНДЫ. TODO: удалить
-```
-SELECT table_name FROM system_schema.tables WHERE keyspace_name = 'shadrin_final';
+Время выполнение микробатча при пачке в 5 записей составило 37 секунд. Во время отладки проверял без подключения датафрейма фичей товаров, время выполнения было примерно 18 секунд, когда на вход поступало 5 записей и 100 записей. Есть подозрение что время выполнения микробатча слабо завиит от объёма входных данных.
 
-SELECT * from shadrin_final.item_features;
-drop table shadrin_final.item_features;
+<details>
+<summary>Содержимое файла apply_model.py.</summary>
+<pre>
+<code>
 
-SELECT * from shadrin_final.baseline;
-drop table shadrin_final.baseline;
+\# coding=utf-8
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, IntegerType, FloatType
+from pyspark.ml.recommendation import ALSModel
+from pyspark.sql import functions as F
+import time
 
-SELECT * from shadrin_final.own_purchases;
-drop table shadrin_final.own_purchases;
-```
+
+spark = SparkSession.builder.appName("shadrin_final_foreach_spark").getOrCreate()
+
+\# указываем одну из нод с кафкой
+kafka_brokers = "bigdataanalytics-worker-0.novalocal:6667"
+
+\# загружаем модель
+model_path = "als_trained"
+model = ALSModel.load(model_path)
+\######################################################################
+\# Загружаем модель и сопутствующие датафреймы.
+\######################################################################
+
+
+\# Метрика precision@k показывает какую долю рекомендованных товаров покупал пользователь.
+def precision_at_k(recs, own):
+    flags = [1 if i in own else 0 for i in recs]
+    return sum(flags) / float(len(recs))
+
+
+precision_at_k_udf = F.udf(precision_at_k)
+
+\# Количество рекомендаций
+k = 5
+
+\# Датафрейм с собственными покупками, для измерения качества рекомендаций
+cass_own_purchases = spark.read \
+    .format("org.apache.spark.sql.cassandra") \
+    .options(table="own_purchases", keyspace="shadrin_final") \
+    .load()
+
+\# Датафрейм с описанием товаров
+cass_item_features = spark.read \
+    .format("org.apache.spark.sql.cassandra") \
+    .options(table="item_features", keyspace="shadrin_final") \
+    .load()
+
+
+def foreach_batch_sink(df, freq):
+    return df \
+        .writeStream \
+        .foreachBatch(foreach_batch_function) \
+        .trigger(processingTime='%s seconds' % freq) \
+        .start()
+
+
+def foreach_batch_function(df, epoch_id):
+    start_time = time.time()
+    # df
+    user_ids = df.select("user_id")
+    # pyton list
+    user_ids_list = user_ids.select('user_id') \
+        .rdd.flatMap(lambda x: x) \
+        .collect()
+    #
+    own_purchases = cass_own_purchases \
+        .filter(F.col("user_id").isin(user_ids_list)) \
+        .withColumnRenamed("item_id_list", "own")
+    train_result = model.recommendForUserSubset(user_ids, k) \
+        .selectExpr("user_id", "recommendations.item_id as recs") \
+        .join(own_purchases, on=['user_id'], how="left") \
+        .withColumn("precision_at_k", precision_at_k_udf(F.col("recs"), F.col("own"))) \
+    #
+    train_result.persist()
+    #
+    train_result.show()
+    #
+    avg_precision_at_k = train_result \
+        .agg({"precision_at_k": "avg"}) \
+        .rdd.flatMap(lambda x: x) \
+        .collect()[0]
+    #
+    duration = time.time() - start_time
+    print "avg_precision_at_k: ", avg_precision_at_k
+    print "duration: ", duration
+    train_result.unpersist()
+
+
+def foreach_batch_function(df, epoch_id):
+    start_time = time.time()
+    # df
+    user_ids = df.select("user_id").distinct()
+    # pyton list
+    user_ids_list = user_ids.select('user_id') \
+        .rdd.flatMap(lambda x: x) \
+        .collect()
+    #
+    own_purchases = cass_own_purchases \
+        .filter(F.col("user_id").isin(user_ids_list)) \
+        .withColumnRenamed("item_id_list", "own")
+    #
+    train_result = model.recommendForUserSubset(user_ids, k) \
+        .selectExpr("user_id", "recommendations.item_id as recs") \
+        .join(own_purchases, on=['user_id'], how="left") \
+        .withColumn("precision_at_k", precision_at_k_udf(F.col("recs"), F.col("own"))) \
+    #
+    train_result.persist()
+    #
+    item_ids_list = df.select("item_id") \
+        .distinct() \
+        .rdd.flatMap(lambda x: x) \
+        .collect()
+    #
+    item_features = cass_item_features \
+        .filter(F.col("product_id").isin(item_ids_list)) \
+        .withColumnRenamed("product_id", "item_id")
+    #
+    extended_df = df \
+        .join(train_result.select("user_id", "recs", "precision_at_k"), on=['user_id'], how="left") \
+        .join(item_features, on=['item_id'], how="left")
+    extended_df.show()
+    #
+    avg_precision_at_k = train_result \
+        .agg({"precision_at_k": "avg"}) \
+        .rdd.flatMap(lambda x: x) \
+        .collect()[0]
+    #
+    duration = time.time() - start_time
+    print "avg_precision_at_k: ", avg_precision_at_k
+    print "duration: ", duration
+    train_result.unpersist()
+
+
+schema_purchases = StructType() \
+    .add("user_id", IntegerType()) \
+    .add("item_id", IntegerType()) \
+    .add("quantity", IntegerType()) \
+    .add("sales_value", FloatType())
+
+raw_data = spark.readStream. \
+    format("kafka"). \
+    option("kafka.bootstrap.servers", kafka_brokers). \
+    option("subscribe", "shadrin_purchases"). \
+    option("startingOffsets", "earliest"). \
+    option("maxOffsetsPerTrigger", "5"). \
+    load()
+
+parsed_data = raw_data \
+    .select(F.from_json(F.col("value").cast("String"), schema_purchases).alias("value"), "offset") \
+    .select("value.*", "offset")
+
+
+s = foreach_batch_sink(parsed_data, 30)
+s.stop()
+
+</code>
+</pre>
+</details>

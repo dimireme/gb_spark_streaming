@@ -32,7 +32,7 @@ own_purchases = data \
 
 
 # Метрика precision@k показывает какую долю рекомендованных товаров покупал пользователь.
-def precision_at_k (recs, own):
+def precision_at_k(recs, own):
     flags = [1 if i in own else 0 for i in recs]
     return sum(flags) / float(len(recs))
 
