@@ -241,35 +241,24 @@ test.count()
 \# Записываем тестовые данные в топик shadrin_purchases
 \######################################################################
 
-\# читаем файлы в стриме
+\# читаем файлы
 raw_files = spark \
-    .readStream \
+    .read \
     .format("csv") \
     .schema(schema_purchases) \
-    .options(path="for_topic", header=False) \
-    .load()
+    .load('for_topic')
 
 \# указываем одну из нод с кафкой
 kafka_brokers = "bigdataanalytics-worker-0.novalocal:6667"
 
-\# пишем стрим в Кафку
-def kafka_sink(df, freq):
-    return df.selectExpr("CAST(null AS STRING) as key", "to_json(struct(*)) AS value") \
-        .writeStream \
-        .format("kafka") \
-        .trigger(processingTime='%s seconds' % freq ) \
-        .option("topic", "shadrin_purchases") \
-        .option("kafka.bootstrap.servers", kafka_brokers) \
-        .option("checkpointLocation", "shadrin_purchases_kafka_checkpoint") \
-        .start()
+\# пишем файл в Кафку
+raw_files.selectExpr("CAST(null AS STRING) as key", "to_json(struct(*)) AS value") \
+    .write \
+    .format("kafka") \
+    .option("topic", "shadrin_purchases") \
+    .option("kafka.bootstrap.servers", kafka_brokers) \
+    .save()
 
-
-stream = kafka_sink(raw_files, 30)
-
-\# На этом этапе нужно посмотреть в соседней консоли как пишется стрим.
-
-\# По завершении останавливаю стрим.
-stream.stop()
 
 \######################################################################
 \# Проверяем, что записалось в топик
@@ -299,7 +288,6 @@ stream = console_output(parsed_purchase, 5)
 stream.stop()
 </code>
 </pre>
-
 </details>
 
 Здесь происходит запись тестовых данных в куфку. В топик `shadrin_purchases` пишется только половина исходного датафрейма, это примерно 1189674 записи. В соседнем терминале проверим, как записались данные.
@@ -360,8 +348,7 @@ stream.stop()
 <summary>Содержимое файла train_model.py.</summary>
 <pre>
 <code>
-
-\# coding=utf-8
+# coding=utf-8
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, IntegerType, FloatType
 from pyspark.ml.recommendation import ALS
@@ -433,7 +420,6 @@ valid_result.show()
 
 \# Сохраняем модель
 model.save("als_trained")
-
 </code>
 </pre>
 </details>
@@ -489,8 +475,7 @@ model.save("als_trained")
 <summary>Содержимое файла apply_model.py.</summary>
 <pre>
 <code>
-
-\# coding=utf-8
+# coding=utf-8
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, IntegerType, FloatType
 from pyspark.ml.recommendation import ALSModel
@@ -611,7 +596,6 @@ parsed_data = raw_data \
 
 s = foreach_batch_sink(parsed_data, 60)
 s.stop()
-
 </code>
 </pre>
 </details>
